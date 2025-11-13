@@ -1,0 +1,67 @@
+{
+  "teams": [
+    {
+      "id": "demo-team-1",
+      "name": "Platform Team",
+      "monthlyCapacityInPersonMonths": 2.5,
+      "capacityOverrides": [
+        {
+          "yearMonth": "2025-12",
+          "capacity": 0.7
+        }
+      ]
+    },
+    {
+      "id": "demo-team-2",
+      "name": "Frontend Team",
+      "monthlyCapacityInPersonMonths": 3
+    }
+  ],
+  "workPackages": [
+    {
+      "id": "demo-wp-1",
+      "title": "User Authentication System",
+      "description": "Implement OAuth2 and JWT-based authentication",
+      "sizeInPersonMonths": 1.5,
+      "priority": 0,
+      "assignedTeamId": "demo-team-1",
+      "scheduledPosition": 0
+    },
+    {
+      "id": "demo-wp-2",
+      "title": "API Rate Limiting",
+      "description": "Add rate limiting to all public API endpoints",
+      "sizeInPersonMonths": 0.8,
+      "priority": 1,
+      "assignedTeamId": "demo-team-1",
+      "scheduledPosition": 1
+    },
+    {
+      "id": "demo-wp-3",
+      "title": "Dashboard Redesign",
+      "description": "Modernize the main dashboard UI",
+      "sizeInPersonMonths": 2,
+      "priority": 2,
+      "assignedTeamId": "demo-team-2",
+      "scheduledPosition": 0
+    },
+    {
+      "id": "demo-wp-4",
+      "title": "Mobile Responsive Design",
+      "description": "Make all pages mobile-friendly",
+      "sizeInPersonMonths": 1.2,
+      "priority": 3,
+      "assignedTeamId": "demo-team-1",
+      "scheduledPosition": 2
+    },
+    {
+      "id": "demo-wp-5",
+      "title": "Database Migration",
+      "description": "Migrate from PostgreSQL to Aurora",
+      "sizeInPersonMonths": 3,
+      "priority": 4,
+      "assignedTeamId": "demo-team-2",
+      "scheduledPosition": 1
+    }
+  ]
+}
