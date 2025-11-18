@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { appState, teams } from '$lib/stores/appState';
 	import Modal from './Modal.svelte';
+	import FormError from './FormError.svelte';
 	import CapacitySparkline from './CapacitySparkline.svelte';
 	import { getNextMonths, formatYearMonth } from '$lib/utils/dates';
 
@@ -15,11 +16,15 @@
 	let editingTeam = $state<string | null>(null);
 	let formName = $state('');
 	let formCapacity = $state(0);
+	let nameError = $state<string | null>(null);
+	let capacityError = $state<string | null>(null);
 
 	function openAddModal() {
 		formName = '';
 		formCapacity = 0;
 		editingTeam = null;
+		nameError = null;
+		capacityError = null;
 		showAddModal = true;
 	}
 
@@ -29,6 +34,8 @@
 			formName = team.name;
 			formCapacity = team.monthlyCapacityInPersonMonths;
 			editingTeam = teamId;
+			nameError = null;
+			capacityError = null;
 			showAddModal = true;
 		}
 	}
@@ -38,10 +45,37 @@
 		editingTeam = null;
 		formName = '';
 		formCapacity = 0;
+		nameError = null;
+		capacityError = null;
+	}
+
+	function validateForm(): boolean {
+		nameError = null;
+		capacityError = null;
+
+		let isValid = true;
+
+		if (!formName.trim()) {
+			nameError = 'Team name is required';
+			isValid = false;
+		} else if (formName.trim().length > 100) {
+			nameError = 'Team name must be 100 characters or less';
+			isValid = false;
+		}
+
+		if (formCapacity <= 0) {
+			capacityError = 'Capacity must be greater than 0';
+			isValid = false;
+		} else if (isNaN(formCapacity)) {
+			capacityError = 'Capacity must be a valid number';
+			isValid = false;
+		}
+
+		return isValid;
 	}
 
 	function handleSubmit() {
-		if (!formName.trim() || formCapacity <= 0) return;
+		if (!validateForm()) return;
 
 		if (editingTeam) {
 			appState.updateTeam(editingTeam, {
@@ -220,10 +254,13 @@
 				id="team-name"
 				type="text"
 				bind:value={formName}
-				class="w-full rounded border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+				class="w-full rounded border px-3 py-2 focus:outline-none focus:ring-1 {nameError
+					? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+					: 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'}"
 				placeholder="e.g., Platform Team"
 				required
 			/>
+			<FormError error={nameError} />
 		</div>
 
 		<div class="mb-6">
@@ -240,10 +277,13 @@
 					const val = e.currentTarget.valueAsNumber;
 					if (!isNaN(val)) formCapacity = val;
 				}}
-				class="w-full rounded border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+				class="w-full rounded border px-3 py-2 focus:outline-none focus:ring-1 {capacityError
+					? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+					: 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'}"
 				placeholder="e.g., 2.5"
 				required
 			/>
+			<FormError error={capacityError} />
 			<p class="mt-1 text-xs text-gray-500">
 				How many person-months of work can this team complete per month?
 			</p>

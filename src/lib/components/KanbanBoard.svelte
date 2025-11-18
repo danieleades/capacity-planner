@@ -207,14 +207,34 @@
 			const result = await response.json();
 			
 			if (result.type === 'failure') {
-				console.error('Failed to assign work package:', result.data?.error);
-				// Reload to revert optimistic update
-				window.location.reload();
+				const errorMsg = result.data?.details || result.data?.error || 'Failed to assign work package';
+				console.error('Failed to assign work package:', errorMsg);
+				
+				// Show error message to user
+				const windowWithHandler = window as Window & { handleFormError?: (msg: string, retry?: () => void) => void };
+				if (typeof window !== 'undefined' && windowWithHandler.handleFormError) {
+					windowWithHandler.handleFormError(errorMsg, () => {
+						window.location.reload();
+					});
+				} else {
+					// Fallback: reload to revert optimistic update
+					window.location.reload();
+				}
 			}
 		} catch (error) {
-			console.error('Failed to assign work package:', error);
-			// Reload to revert optimistic update
-			window.location.reload();
+			const errorMsg = error instanceof Error ? error.message : 'Failed to assign work package';
+			console.error('Failed to assign work package:', errorMsg);
+			
+			// Show error message to user
+			const windowWithHandler = window as Window & { handleFormError?: (msg: string, retry?: () => void) => void };
+			if (typeof window !== 'undefined' && windowWithHandler.handleFormError) {
+				windowWithHandler.handleFormError(errorMsg, () => {
+					window.location.reload();
+				});
+			} else {
+				// Fallback: reload to revert optimistic update
+				window.location.reload();
+			}
 		}
 	}
 

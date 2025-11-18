@@ -1,5 +1,6 @@
 import type { PageServerLoad, Actions } from './$types';
 import { fail } from '@sveltejs/kit';
+import { ZodError } from 'zod';
 import { getPlanningView } from '$lib/server/repositories/planning.repository';
 import {
 	createWorkPackage,
@@ -9,6 +10,26 @@ import {
 	unassignWorkPackage
 } from '$lib/server/repositories/work-packages.repository';
 import { setCapacityOverride } from '$lib/server/repositories/teams.repository';
+
+/**
+ * Format error messages for user-friendly display
+ */
+function formatErrorMessage(error: unknown): string {
+	if (error instanceof ZodError) {
+		// Format Zod validation errors
+		const messages = error.issues.map((issue) => {
+			const path = issue.path.join('.');
+			return path ? `${path}: ${issue.message}` : issue.message;
+		});
+		return `Validation error: ${messages.join(', ')}`;
+	}
+
+	if (error instanceof Error) {
+		return error.message;
+	}
+
+	return 'An unexpected error occurred';
+}
 
 export const load: PageServerLoad = async () => {
 	try {
@@ -31,20 +52,28 @@ export const actions: Actions = {
 			const capacityStr = data.get('capacity') as string;
 
 			if (!teamId || !yearMonth || !capacityStr) {
-				return fail(400, { error: 'Missing required fields: teamId, yearMonth, or capacity' });
+				return fail(400, {
+					error: 'Missing required fields',
+					details: 'Please provide teamId, yearMonth, and capacity'
+				});
 			}
 
 			const capacity = parseFloat(capacityStr);
-			if (isNaN(capacity)) {
-				return fail(400, { error: 'Invalid capacity value' });
+			if (isNaN(capacity) || capacity <= 0) {
+				return fail(400, {
+					error: 'Invalid capacity value',
+					details: 'Capacity must be a positive number'
+				});
 			}
 
 			await setCapacityOverride(teamId, yearMonth, capacity);
 			return { success: true };
 		} catch (error) {
 			console.error('Failed to update capacity:', error);
-			const message = error instanceof Error ? error.message : 'Failed to update capacity';
-			return fail(500, { error: message });
+			return fail(500, {
+				error: 'Failed to update capacity',
+				details: formatErrorMessage(error)
+			});
 		}
 	},
 
@@ -56,7 +85,10 @@ export const actions: Actions = {
 			const positionStr = data.get('position') as string;
 
 			if (!workPackageId) {
-				return fail(400, { error: 'Missing required field: workPackageId' });
+				return fail(400, {
+					error: 'Missing work package ID',
+					details: 'Work package ID is required'
+				});
 			}
 
 			// If teamId is null or empty, unassign the work package
@@ -66,16 +98,21 @@ export const actions: Actions = {
 			}
 
 			const position = positionStr ? parseInt(positionStr, 10) : 0;
-			if (isNaN(position)) {
-				return fail(400, { error: 'Invalid position value' });
+			if (isNaN(position) || position < 0) {
+				return fail(400, {
+					error: 'Invalid position value',
+					details: 'Position must be a non-negative integer'
+				});
 			}
 
 			await assignWorkPackage(workPackageId, teamId, position);
 			return { success: true };
 		} catch (error) {
 			console.error('Failed to assign work package:', error);
-			const message = error instanceof Error ? error.message : 'Failed to assign work package';
-			return fail(500, { error: message });
+			return fail(500, {
+				error: 'Failed to assign work package',
+				details: formatErrorMessage(error)
+			});
 		}
 	},
 
@@ -85,7 +122,10 @@ export const actions: Actions = {
 			const id = data.get('id') as string;
 
 			if (!id) {
-				return fail(400, { error: 'Missing required field: id' });
+				return fail(400, {
+					error: 'Missing work package ID',
+					details: 'Work package ID is required'
+				});
 			}
 
 			const updateData: {
@@ -97,6 +137,12 @@ export const actions: Actions = {
 
 			const title = data.get('title') as string | null;
 			if (title !== null) {
+				if (title.trim().length === 0) {
+					return fail(400, {
+						error: 'Invalid title',
+						details: 'Title cannot be empty'
+					});
+				}
 				updateData.title = title;
 			}
 
@@ -108,8 +154,11 @@ export const actions: Actions = {
 			const sizeStr = data.get('sizeInPersonMonths') as string | null;
 			if (sizeStr !== null) {
 				const size = parseFloat(sizeStr);
-				if (isNaN(size)) {
-					return fail(400, { error: 'Invalid sizeInPersonMonths value' });
+				if (isNaN(size) || size <= 0) {
+					return fail(400, {
+						error: 'Invalid size',
+						details: 'Size must be a positive number'
+					});
 				}
 				updateData.sizeInPersonMonths = size;
 			}
@@ -117,8 +166,11 @@ export const actions: Actions = {
 			const priorityStr = data.get('priority') as string | null;
 			if (priorityStr !== null) {
 				const priority = parseInt(priorityStr, 10);
-				if (isNaN(priority)) {
-					return fail(400, { error: 'Invalid priority value' });
+				if (isNaN(priority) || priority < 0) {
+					return fail(400, {
+						error: 'Invalid priority',
+						details: 'Priority must be a non-negative integer'
+					});
 				}
 				updateData.priority = priority;
 			}
@@ -127,8 +179,10 @@ export const actions: Actions = {
 			return { success: true };
 		} catch (error) {
 			console.error('Failed to update work package:', error);
-			const message = error instanceof Error ? error.message : 'Failed to update work package';
-			return fail(500, { error: message });
+			return fail(500, {
+				error: 'Failed to update work package',
+				details: formatErrorMessage(error)
+			});
 		}
 	},
 
@@ -142,23 +196,37 @@ export const actions: Actions = {
 
 			if (!title || !sizeStr || !priorityStr) {
 				return fail(400, {
-					error: 'Missing required fields: title, sizeInPersonMonths, or priority'
+					error: 'Missing required fields',
+					details: 'Title, size, and priority are required'
+				});
+			}
+
+			if (title.trim().length === 0) {
+				return fail(400, {
+					error: 'Invalid title',
+					details: 'Title cannot be empty'
 				});
 			}
 
 			const sizeInPersonMonths = parseFloat(sizeStr);
-			if (isNaN(sizeInPersonMonths)) {
-				return fail(400, { error: 'Invalid sizeInPersonMonths value' });
+			if (isNaN(sizeInPersonMonths) || sizeInPersonMonths <= 0) {
+				return fail(400, {
+					error: 'Invalid size',
+					details: 'Size must be a positive number'
+				});
 			}
 
 			const priority = parseInt(priorityStr, 10);
-			if (isNaN(priority)) {
-				return fail(400, { error: 'Invalid priority value' });
+			if (isNaN(priority) || priority < 0) {
+				return fail(400, {
+					error: 'Invalid priority',
+					details: 'Priority must be a non-negative integer'
+				});
 			}
 
 			const result = await createWorkPackage({
-				title,
-				description: description || undefined,
+				title: title.trim(),
+				description: description?.trim() || undefined,
 				sizeInPersonMonths,
 				priority
 			});
@@ -166,8 +234,10 @@ export const actions: Actions = {
 			return { success: true, id: result.id };
 		} catch (error) {
 			console.error('Failed to create work package:', error);
-			const message = error instanceof Error ? error.message : 'Failed to create work package';
-			return fail(500, { error: message });
+			return fail(500, {
+				error: 'Failed to create work package',
+				details: formatErrorMessage(error)
+			});
 		}
 	},
 
@@ -177,15 +247,20 @@ export const actions: Actions = {
 			const id = data.get('id') as string;
 
 			if (!id) {
-				return fail(400, { error: 'Missing required field: id' });
+				return fail(400, {
+					error: 'Missing work package ID',
+					details: 'Work package ID is required'
+				});
 			}
 
 			await deleteWorkPackage(id);
 			return { success: true };
 		} catch (error) {
 			console.error('Failed to delete work package:', error);
-			const message = error instanceof Error ? error.message : 'Failed to delete work package';
-			return fail(500, { error: message });
+			return fail(500, {
+				error: 'Failed to delete work package',
+				details: formatErrorMessage(error)
+			});
 		}
 	}
 };

@@ -51,6 +51,7 @@
 	"dependencies": {
 		"better-sqlite3": "^12.4.1",
 		"drizzle-orm": "^0.44.7",
+		"optimistikit": "^1.0.2",
 		"svelte-dnd-action": "^0.9.67",
 		"zod": "^4.1.12"
 	}

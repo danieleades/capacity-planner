@@ -306,7 +306,7 @@ describe('Planning Page Routes', () => {
 			const result = await actions.assignWorkPackage(mockEvent as Parameters<typeof actions.assignWorkPackage>[0]);
 
 			expect(result).toHaveProperty('status', 400);
-			expectErrorMessage(result, 'Missing required field: workPackageId');
+			expectErrorMessage(result, 'Missing work package ID');
 		});
 
 		it('should return error when position is invalid', async () => {
@@ -387,7 +387,7 @@ describe('Planning Page Routes', () => {
 			const result = await actions.createWorkPackage(mockEvent as Parameters<typeof actions.createWorkPackage>[0]);
 
 			expect(result).toHaveProperty('status', 400);
-			expectErrorMessage(result, 'Invalid sizeInPersonMonths value');
+			expectErrorMessage(result, 'Invalid size');
 		});
 
 		it('should return error when priority is invalid', async () => {
@@ -400,7 +400,7 @@ describe('Planning Page Routes', () => {
 			const result = await actions.createWorkPackage(mockEvent as Parameters<typeof actions.createWorkPackage>[0]);
 
 			expect(result).toHaveProperty('status', 400);
-			expectErrorMessage(result, 'Invalid priority value');
+			expectErrorMessage(result, 'Invalid priority');
 		});
 	});
 
@@ -438,7 +438,7 @@ describe('Planning Page Routes', () => {
 			const result = await actions.deleteWorkPackage(mockEvent as Parameters<typeof actions.deleteWorkPackage>[0]);
 
 			expect(result).toHaveProperty('status', 400);
-			expectErrorMessage(result, 'Missing required field: id');
+			expectErrorMessage(result, 'Missing work package ID');
 		});
 	});
 });
