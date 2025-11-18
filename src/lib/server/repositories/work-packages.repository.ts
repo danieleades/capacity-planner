@@ -1,6 +1,6 @@
 import { db as defaultDb } from '../db';
 import { workPackages } from '../schema';
-import { eq, and } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import type { WorkPackage, NewWorkPackage, WorkPackageUpdate, DbParam } from './types';
 import { workPackageValidation, handleValidationError } from '../validation';
 import { withTimestamps, withUpdatedTimestamp, dbOperation } from './db-helpers';
@@ -127,31 +127,30 @@ export async function unassignWorkPackage(
 }
 
 /**
- * Reorder work packages for a team (for drag-and-drop functionality)
- * Updates the scheduledPosition for all work packages in the provided order
- * @param teamId - Team ID
- * @param workPackageIds - Array of work package IDs in the desired order
+ * Batch update work package assignments and positions (for drag-and-drop functionality)
+ * Updates multiple work packages atomically in a single transaction
+ * @param updates - Array of work package updates with id, teamId, and position
  * @param db - Database instance (defaults to main db)
  */
 export async function reorderWorkPackages(
-	teamId: string,
-	workPackageIds: string[],
+	updates: Array<{ id: string; teamId: string | null; position: number }>,
 	db: DbParam = defaultDb
 ): Promise<void> {
 	return dbOperation(async () => {
-		// Update each work package with its new position
-		// Using Promise.all to update all positions in parallel
-		await Promise.all(
-			workPackageIds.map((workPackageId, index) =>
-				db
-					.update(workPackages)
+		// Use transaction for atomicity - all updates succeed or all fail
+		// Note: better-sqlite3 transactions must be synchronous (no async/await)
+		db.transaction((tx) => {
+			for (const update of updates) {
+				tx.update(workPackages)
 					.set(
 						withUpdatedTimestamp({
-							scheduledPosition: index
+							assignedTeamId: update.teamId,
+							scheduledPosition: update.position
 						})
 					)
-					.where(and(eq(workPackages.id, workPackageId), eq(workPackages.assignedTeamId, teamId)))
-			)
-		);
+					.where(eq(workPackages.id, update.id))
+					.run();
+			}
+		});
 	}, 'Failed to reorder work packages');
 }

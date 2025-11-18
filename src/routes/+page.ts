@@ -1,6 +1,5 @@
-import { appState } from '$lib/stores/appState';
 import type { PageLoad } from './$types';
-import type { AppState, Team, WorkPackage } from '$lib/types';
+import type { AppState, Team, WorkPackage, PlanningPageData } from '$lib/types';
 
 export const load: PageLoad = async ({ data }) => {
 	// Transform PlanningView to AppState format
@@ -43,10 +42,7 @@ export const load: PageLoad = async ({ data }) => {
 		workPackages
 	};
 
-	// Initialize store with server data during load (runs on both server and client)
-	appState.set(appStateData);
-
 	return {
 		initialState: appStateData
-	};
+	} satisfies PlanningPageData;
 };

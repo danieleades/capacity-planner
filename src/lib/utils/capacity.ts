@@ -81,9 +81,19 @@ export function simulateWorkCompletion(
 /**
  * Calculate backlog metrics for a team with variable capacity support
  * Uses simulation to ensure monthsToComplete matches estimatedCompletionDate
+ * 
+ * Performance: If workPackages are already filtered for this team, pass preFiltered=true
+ * to skip redundant filtering (O(1) vs O(n))
  */
-export function calculateTeamBacklog(team: Team, workPackages: WorkPackage[]): TeamBacklogMetrics {
-	const totalWorkMonths = calculateTotalWorkMonths(team.id, workPackages);
+export function calculateTeamBacklog(
+	team: Team, 
+	workPackages: WorkPackage[],
+	preFiltered: boolean = false
+): TeamBacklogMetrics {
+	// Optimization: Skip filtering if workPackages are already filtered for this team
+	const totalWorkMonths = preFiltered
+		? workPackages.reduce((sum, wp) => sum + wp.sizeInPersonMonths, 0)
+		: calculateTotalWorkMonths(team.id, workPackages);
 
 	if (totalWorkMonths <= 0) {
 		return {

@@ -2,11 +2,15 @@
 	import { page } from '$app/stores';
 	import { optimistikit } from 'optimistikit';
 	import { enhance as svelteKitEnhance } from '$app/forms';
+	import type { PageData } from './$types';
 	import TeamManager from '$lib/components/TeamManager.svelte';
 	import KanbanBoard from '$lib/components/KanbanBoard.svelte';
 	import WorkPackagesTable from '$lib/components/WorkPackagesTable.svelte';
 	import ErrorBanner from '$lib/components/ErrorBanner.svelte';
 	import { appState } from '$lib/stores/appState';
+
+	// Use $props to get page data instead of $page store
+	const { data }: { data: PageData } = $props();
 
 	let activeTab = $state<'board' | 'workPackages' | 'teams'>('board');
 	let errorMessage = $state<string>('');
@@ -14,12 +18,15 @@
 
 	// Wrap page data with optimistikit() to enable optimistic updates
 	const { data: optimisticData, enhance: optimisticEnhance } = optimistikit(
-		() => $page.data,
+		() => data,
 		{
 			key: 'planning-data',
 			enhance: svelteKitEnhance
 		}
 	);
+
+	// Track whether store has been initialized to prevent overwriting
+	let storeInitialized = $state(false);
 
 	// Watch for form action results to handle errors
 	$effect(() => {
@@ -30,10 +37,12 @@
 		}
 	});
 
-	// Initialize appState from server data
+	// Initialize appState from server data only once in browser context
 	$effect(() => {
-		if (optimisticData.initialState) {
+		// Only run in browser and only initialize once
+		if (typeof window !== 'undefined' && !storeInitialized && optimisticData.initialState) {
 			appState.set(optimisticData.initialState);
+			storeInitialized = true;
 		}
 	});
 

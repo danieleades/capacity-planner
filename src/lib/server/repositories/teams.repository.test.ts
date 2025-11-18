@@ -7,7 +7,7 @@ import {
 	setCapacityOverride,
 	removeCapacityOverride
 } from './teams.repository';
-import { teams, capacityOverrides } from '../schema';
+import { teams, capacityOverrides, workPackages } from '../schema';
 
 describe('teams repository', () => {
 	const { db, sqlite } = createTestDb();
@@ -165,6 +165,38 @@ describe('teams repository', () => {
 
 			const allOverrides = db.select().from(capacityOverrides).all();
 			expect(allOverrides).toHaveLength(0);
+		});
+
+		it('should unassign work packages from the team', async () => {
+			const { id: teamId } = await createTeam(
+				{
+					name: 'Team',
+					monthlyCapacity: 2.0
+				},
+				db
+			);
+
+			// Create a work package and assign it to the team
+			const workPackageId = crypto.randomUUID();
+			db.insert(workPackages)
+				.values({
+					id: workPackageId,
+					title: 'Test Work Package',
+					description: null,
+					sizeInPersonMonths: 1.0,
+					priority: 1,
+					assignedTeamId: teamId,
+					scheduledPosition: 0,
+					createdAt: new Date(),
+					updatedAt: new Date()
+				})
+				.run();
+
+			await deleteTeam(teamId, db);
+
+			const workPackage = db.select().from(workPackages).all()[0];
+			expect(workPackage.assignedTeamId).toBeNull();
+			expect(workPackage.scheduledPosition).toBeNull();
 		});
 	});
 

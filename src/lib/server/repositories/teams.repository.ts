@@ -1,5 +1,5 @@
 import { db as defaultDb } from '../db';
-import { teams, capacityOverrides } from '../schema';
+import { teams, capacityOverrides, workPackages } from '../schema';
 import { eq, and } from 'drizzle-orm';
 import type { Team, CapacityOverride, NewTeam, TeamUpdate, DbParam } from './types';
 import { teamValidation, capacityOverrideValidation, handleValidationError } from '../validation';
@@ -65,12 +65,25 @@ export async function updateTeam(
 /**
  * Delete a team
  * Cascade deletion will automatically remove related capacity overrides
- * Work packages assigned to this team will have their assignedTeamId set to null
+ * Work packages assigned to this team will have their assignedTeamId and scheduledPosition set to null
  * @param id - Team ID
  * @param db - Database instance (defaults to main db)
  */
 export async function deleteTeam(id: string, db: DbParam = defaultDb): Promise<void> {
 	return dbOperation(async () => {
+		// First, unassign all work packages from this team
+		// This ensures both assignedTeamId and scheduledPosition are set to null
+		await db
+			.update(workPackages)
+			.set(
+				withUpdatedTimestamp({
+					assignedTeamId: null,
+					scheduledPosition: null
+				})
+			)
+			.where(eq(workPackages.assignedTeamId, id));
+
+		// Then delete the team (cascade will handle capacity overrides)
 		await db.delete(teams).where(eq(teams.id, id));
 	}, 'Failed to delete team');
 }

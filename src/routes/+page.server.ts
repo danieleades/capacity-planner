@@ -7,9 +7,15 @@ import {
 	updateWorkPackage,
 	deleteWorkPackage,
 	assignWorkPackage,
-	unassignWorkPackage
+	unassignWorkPackage,
+	reorderWorkPackages
 } from '$lib/server/repositories/work-packages.repository';
-import { setCapacityOverride } from '$lib/server/repositories/teams.repository';
+import {
+	setCapacityOverride,
+	createTeam,
+	updateTeam,
+	deleteTeam
+} from '$lib/server/repositories/teams.repository';
 
 /**
  * Format error messages for user-friendly display
@@ -59,10 +65,10 @@ export const actions: Actions = {
 			}
 
 			const capacity = parseFloat(capacityStr);
-			if (isNaN(capacity) || capacity <= 0) {
+			if (isNaN(capacity) || capacity < 0) {
 				return fail(400, {
 					error: 'Invalid capacity value',
-					details: 'Capacity must be a positive number'
+					details: 'Capacity must be a non-negative number'
 				});
 			}
 
@@ -259,6 +265,186 @@ export const actions: Actions = {
 			console.error('Failed to delete work package:', error);
 			return fail(500, {
 				error: 'Failed to delete work package',
+				details: formatErrorMessage(error)
+			});
+		}
+	},
+
+	createTeam: async ({ request }) => {
+		try {
+			const data = await request.formData();
+			const name = data.get('name') as string;
+			const monthlyCapacityStr = data.get('monthlyCapacity') as string;
+
+			if (!name || !monthlyCapacityStr) {
+				return fail(400, {
+					error: 'Missing required fields',
+					details: 'Name and monthly capacity are required'
+				});
+			}
+
+			if (name.trim().length === 0) {
+				return fail(400, {
+					error: 'Invalid name',
+					details: 'Name cannot be empty'
+				});
+			}
+
+			const monthlyCapacity = parseFloat(monthlyCapacityStr);
+			if (isNaN(monthlyCapacity) || monthlyCapacity <= 0) {
+				return fail(400, {
+					error: 'Invalid monthly capacity',
+					details: 'Monthly capacity must be a positive number'
+				});
+			}
+
+			const result = await createTeam({
+				name: name.trim(),
+				monthlyCapacity
+			});
+
+			return { success: true, id: result.id };
+		} catch (error) {
+			console.error('Failed to create team:', error);
+			return fail(500, {
+				error: 'Failed to create team',
+				details: formatErrorMessage(error)
+			});
+		}
+	},
+
+	updateTeam: async ({ request }) => {
+		try {
+			const data = await request.formData();
+			const id = data.get('id') as string;
+
+			if (!id) {
+				return fail(400, {
+					error: 'Missing team ID',
+					details: 'Team ID is required'
+				});
+			}
+
+			const updateData: {
+				name?: string;
+				monthlyCapacity?: number;
+			} = {};
+
+			const name = data.get('name') as string | null;
+			if (name !== null) {
+				if (name.trim().length === 0) {
+					return fail(400, {
+						error: 'Invalid name',
+						details: 'Name cannot be empty'
+					});
+				}
+				updateData.name = name.trim();
+			}
+
+			const monthlyCapacityStr = data.get('monthlyCapacity') as string | null;
+			if (monthlyCapacityStr !== null) {
+				const monthlyCapacity = parseFloat(monthlyCapacityStr);
+				if (isNaN(monthlyCapacity) || monthlyCapacity <= 0) {
+					return fail(400, {
+						error: 'Invalid monthly capacity',
+						details: 'Monthly capacity must be a positive number'
+					});
+				}
+				updateData.monthlyCapacity = monthlyCapacity;
+			}
+
+			await updateTeam(id, updateData);
+			return { success: true };
+		} catch (error) {
+			console.error('Failed to update team:', error);
+			return fail(500, {
+				error: 'Failed to update team',
+				details: formatErrorMessage(error)
+			});
+		}
+	},
+
+	deleteTeam: async ({ request }) => {
+		try {
+			const data = await request.formData();
+			const id = data.get('id') as string;
+
+			if (!id) {
+				return fail(400, {
+					error: 'Missing team ID',
+					details: 'Team ID is required'
+				});
+			}
+
+			await deleteTeam(id);
+			return { success: true };
+		} catch (error) {
+			console.error('Failed to delete team:', error);
+			return fail(500, {
+				error: 'Failed to delete team',
+				details: formatErrorMessage(error)
+			});
+		}
+	},
+
+	reorderWorkPackages: async ({ request }) => {
+		try {
+			const data = await request.formData();
+			const updatesJson = data.get('updates') as string;
+
+			if (!updatesJson) {
+				return fail(400, {
+					error: 'Missing updates data',
+					details: 'Updates array is required'
+				});
+			}
+
+			let updates: Array<{ id: string; teamId: string | null; position: number }>;
+			try {
+				updates = JSON.parse(updatesJson);
+			} catch {
+				return fail(400, {
+					error: 'Invalid updates format',
+					details: 'Updates must be valid JSON'
+				});
+			}
+
+			// Validate updates array
+			if (!Array.isArray(updates) || updates.length === 0) {
+				return fail(400, {
+					error: 'Invalid updates array',
+					details: 'Updates must be a non-empty array'
+				});
+			}
+
+			// Validate each update object
+			for (const update of updates) {
+				if (!update.id || typeof update.id !== 'string') {
+					return fail(400, {
+						error: 'Invalid update object',
+						details: 'Each update must have a valid id'
+					});
+				}
+				if (update.teamId !== null && typeof update.teamId !== 'string') {
+					return fail(400, {
+						error: 'Invalid update object',
+						details: 'teamId must be a string or null'
+					});
+				}
+				if (typeof update.position !== 'number' || update.position < 0) {
+					return fail(400, {
+						error: 'Invalid update object',
+						details: 'position must be a non-negative number'
+					});
+				}
+			}
+
+			await reorderWorkPackages(updates);
+			return { success: true };
+		} catch (error) {
+			console.error('Failed to reorder work packages:', error);
+			return fail(500, {
+				error: 'Failed to reorder work packages',
 				details: formatErrorMessage(error)
 			});
 		}

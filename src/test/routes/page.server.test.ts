@@ -46,6 +46,9 @@ vi.mock('$lib/server/repositories/teams.repository', async () => {
 	);
 	return {
 		createTeam: (input: Parameters<typeof actual.createTeam>[0]) => actual.createTeam(input, testDb),
+		updateTeam: (id: string, input: Parameters<typeof actual.updateTeam>[1]) =>
+			actual.updateTeam(id, input, testDb),
+		deleteTeam: (id: string) => actual.deleteTeam(id, testDb),
 		setCapacityOverride: (
 			teamId: string,
 			yearMonth: string,
@@ -439,6 +442,250 @@ describe('Planning Page Routes', () => {
 
 			expect(result).toHaveProperty('status', 400);
 			expectErrorMessage(result, 'Missing work package ID');
+		});
+	});
+
+	describe('createTeam action', () => {
+		it('should create team and persist to database', async () => {
+			const formData = new FormData();
+			formData.set('name', 'Engineering Team');
+			formData.set('monthlyCapacity', '5.0');
+
+			const mockEvent = createMockRequest(formData);
+			const result = await actions.createTeam(mockEvent as Parameters<typeof actions.createTeam>[0]);
+
+			expect(result).toHaveProperty('success', true);
+			expect(result).toHaveProperty('id');
+
+			// Verify the team was persisted to database
+			const view = await load({} as Parameters<typeof load>[0]);
+			if (!view || !('planningView' in view)) {
+				throw new Error('Expected planningView in result');
+			}
+			expect(view.planningView.teams).toHaveLength(1);
+			expect(view.planningView.teams[0].name).toBe('Engineering Team');
+			expect(view.planningView.teams[0].monthlyCapacity).toBe(5.0);
+		});
+
+		it('should return error when name is missing', async () => {
+			const formData = new FormData();
+			formData.set('monthlyCapacity', '5.0');
+
+			const mockEvent = createMockRequest(formData);
+			const result = await actions.createTeam(mockEvent as Parameters<typeof actions.createTeam>[0]);
+
+			expect(result).toHaveProperty('status', 400);
+			expectErrorMessage(result, 'Missing required fields');
+		});
+
+		it('should return error when monthlyCapacity is invalid', async () => {
+			const formData = new FormData();
+			formData.set('name', 'Engineering Team');
+			formData.set('monthlyCapacity', 'invalid');
+
+			const mockEvent = createMockRequest(formData);
+			const result = await actions.createTeam(mockEvent as Parameters<typeof actions.createTeam>[0]);
+
+			expect(result).toHaveProperty('status', 400);
+			expectErrorMessage(result, 'Invalid monthly capacity');
+		});
+	});
+
+	describe('updateTeam action', () => {
+		it('should update team and persist changes to database', async () => {
+			const team = await createTeam(
+				{
+					name: 'Original Team',
+					monthlyCapacity: 3.0
+				},
+				testDb
+			);
+
+			const formData = new FormData();
+			formData.set('id', team.id);
+			formData.set('name', 'Updated Team');
+			formData.set('monthlyCapacity', '4.5');
+
+			const mockEvent = createMockRequest(formData);
+			const result = await actions.updateTeam(mockEvent as Parameters<typeof actions.updateTeam>[0]);
+
+			expect(result).toEqual({ success: true });
+
+			// Verify the changes were persisted to database
+			const view = await load({} as Parameters<typeof load>[0]);
+			if (!view || !('planningView' in view)) {
+				throw new Error('Expected planningView in result');
+			}
+			expect(view.planningView.teams).toHaveLength(1);
+			expect(view.planningView.teams[0].name).toBe('Updated Team');
+			expect(view.planningView.teams[0].monthlyCapacity).toBe(4.5);
+		});
+
+		it('should update only name when monthlyCapacity is not provided', async () => {
+			const team = await createTeam(
+				{
+					name: 'Original Team',
+					monthlyCapacity: 3.0
+				},
+				testDb
+			);
+
+			const formData = new FormData();
+			formData.set('id', team.id);
+			formData.set('name', 'Updated Team');
+
+			const mockEvent = createMockRequest(formData);
+			const result = await actions.updateTeam(mockEvent as Parameters<typeof actions.updateTeam>[0]);
+
+			expect(result).toEqual({ success: true });
+
+			const view = await load({} as Parameters<typeof load>[0]);
+			if (!view || !('planningView' in view)) {
+				throw new Error('Expected planningView in result');
+			}
+			expect(view.planningView.teams[0].name).toBe('Updated Team');
+			expect(view.planningView.teams[0].monthlyCapacity).toBe(3.0);
+		});
+
+		it('should return error when id is missing', async () => {
+			const formData = new FormData();
+			formData.set('name', 'Updated Team');
+
+			const mockEvent = createMockRequest(formData);
+			const result = await actions.updateTeam(mockEvent as Parameters<typeof actions.updateTeam>[0]);
+
+			expect(result).toHaveProperty('status', 400);
+			expectErrorMessage(result, 'Missing team ID');
+		});
+	});
+
+	describe('deleteTeam action', () => {
+		it('should delete team and unassign work packages', async () => {
+			const team = await createTeam(
+				{
+					name: 'Test Team',
+					monthlyCapacity: 3.0
+				},
+				testDb
+			);
+
+			const wp = await createWorkPackage(
+				{
+					title: 'Test Work Package',
+					sizeInPersonMonths: 2.0,
+					priority: 1
+				},
+				testDb
+			);
+
+			await assignWorkPackage(wp.id, team.id, 0, testDb);
+
+			const formData = new FormData();
+			formData.set('id', team.id);
+
+			const mockEvent = createMockRequest(formData);
+			const result = await actions.deleteTeam(mockEvent as Parameters<typeof actions.deleteTeam>[0]);
+
+			expect(result).toEqual({ success: true });
+
+			// Verify the team was deleted
+			const view = await load({} as Parameters<typeof load>[0]);
+			if (!view || !('planningView' in view)) {
+				throw new Error('Expected planningView in result');
+			}
+			expect(view.planningView.teams).toHaveLength(0);
+			
+			// Verify work package was unassigned
+			expect(view.planningView.unassignedWorkPackages).toHaveLength(1);
+			expect(view.planningView.unassignedWorkPackages[0].id).toBe(wp.id);
+		});
+
+		it('should delete team with capacity overrides', async () => {
+			const team = await createTeam(
+				{
+					name: 'Test Team',
+					monthlyCapacity: 3.0
+				},
+				testDb
+			);
+
+			await setCapacityOverride(team.id, '2025-12', 4.5, testDb);
+
+			const formData = new FormData();
+			formData.set('id', team.id);
+
+			const mockEvent = createMockRequest(formData);
+			const result = await actions.deleteTeam(mockEvent as Parameters<typeof actions.deleteTeam>[0]);
+
+			expect(result).toEqual({ success: true });
+
+			// Verify the team and its capacity overrides were deleted
+			const view = await load({} as Parameters<typeof load>[0]);
+			if (!view || !('planningView' in view)) {
+				throw new Error('Expected planningView in result');
+			}
+			expect(view.planningView.teams).toHaveLength(0);
+		});
+
+		it('should return error when id is missing', async () => {
+			const formData = new FormData();
+
+			const mockEvent = createMockRequest(formData);
+			const result = await actions.deleteTeam(mockEvent as Parameters<typeof actions.deleteTeam>[0]);
+
+			expect(result).toHaveProperty('status', 400);
+			expectErrorMessage(result, 'Missing team ID');
+		});
+	});
+
+	describe('updateCapacity action - zero values', () => {
+		it('should accept zero as valid capacity value', async () => {
+			const team = await createTeam(
+				{
+					name: 'Test Team',
+					monthlyCapacity: 3.0
+				},
+				testDb
+			);
+
+			const formData = new FormData();
+			formData.set('teamId', team.id);
+			formData.set('yearMonth', '2025-12');
+			formData.set('capacity', '0');
+
+			const mockEvent = createMockRequest(formData);
+			const result = await actions.updateCapacity(mockEvent as Parameters<typeof actions.updateCapacity>[0]);
+
+			expect(result).toEqual({ success: true });
+
+			// Verify zero capacity was persisted
+			const view = await load({} as Parameters<typeof load>[0]);
+			if (!view || !('planningView' in view)) {
+				throw new Error('Expected planningView in result');
+			}
+			expect(view.planningView.teams[0].capacityOverrides).toHaveLength(1);
+			expect(view.planningView.teams[0].capacityOverrides[0].capacity).toBe(0);
+		});
+
+		it('should reject negative capacity values', async () => {
+			const team = await createTeam(
+				{
+					name: 'Test Team',
+					monthlyCapacity: 3.0
+				},
+				testDb
+			);
+
+			const formData = new FormData();
+			formData.set('teamId', team.id);
+			formData.set('yearMonth', '2025-12');
+			formData.set('capacity', '-1');
+
+			const mockEvent = createMockRequest(formData);
+			const result = await actions.updateCapacity(mockEvent as Parameters<typeof actions.updateCapacity>[0]);
+
+			expect(result).toHaveProperty('status', 400);
+			expectErrorMessage(result, 'Invalid capacity value');
 		});
 	});
 });

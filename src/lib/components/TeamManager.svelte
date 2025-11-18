@@ -1,13 +1,14 @@
 <script lang="ts">
-	import { appState, teams } from '$lib/stores/appState';
+	import { teams } from '$lib/stores/appState';
+	import type { OptimisticEnhanceAction } from '$lib/types/optimistic';
+	import type { Team, WorkPackage, PlanningPageData } from '$lib/types';
 	import Modal from './Modal.svelte';
 	import FormError from './FormError.svelte';
 	import CapacitySparkline from './CapacitySparkline.svelte';
 	import { getNextMonths, formatYearMonth } from '$lib/utils/dates';
 
 	interface Props {
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		optimisticEnhance: any;
+		optimisticEnhance: OptimisticEnhanceAction<PlanningPageData>;
 	}
 
 	let { optimisticEnhance }: Props = $props();
@@ -18,6 +19,7 @@
 	let formCapacity = $state(0);
 	let nameError = $state<string | null>(null);
 	let capacityError = $state<string | null>(null);
+	let teamFormRef = $state<HTMLFormElement | null>(null);
 
 	function openAddModal() {
 		formName = '';
@@ -74,24 +76,12 @@
 		return isValid;
 	}
 
-	function handleSubmit() {
-		if (!validateForm()) return;
-
-		if (editingTeam) {
-			appState.updateTeam(editingTeam, {
-				name: formName.trim(),
-				monthlyCapacityInPersonMonths: formCapacity,
-			});
-		} else {
-			appState.addTeam(formName.trim(), formCapacity);
-		}
-
-		closeModal();
-	}
-
 	function handleDelete(teamId: string) {
 		if (confirm('Are you sure you want to delete this team? Work packages will be unassigned.')) {
-			appState.deleteTeam(teamId);
+			const form = document.getElementById(`delete-form-${teamId}`) as HTMLFormElement;
+			if (form) {
+				form.requestSubmit();
+			}
 		}
 	}
 </script>
@@ -113,6 +103,30 @@
 		<div class="space-y-4">
 			{#each $teams as team (team.id)}
 				<div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+					<!-- Hidden delete form -->
+					<form
+						id="delete-form-{team.id}"
+						method="POST"
+						action="?/deleteTeam"
+						use:optimisticEnhance={(data, input) => {
+							// Optimistically remove the team
+							const teamId = input.formData.get('id') as string;
+							
+							if (data.initialState) {
+								// Remove team from teams array
+								data.initialState.teams = data.initialState.teams.filter((t: Team) => t.id !== teamId);
+								
+								// Unassign work packages from this team
+								data.initialState.workPackages = data.initialState.workPackages.map((wp: WorkPackage) =>
+									wp.assignedTeamId === teamId ? { ...wp, assignedTeamId: undefined } : wp
+								);
+							}
+						}}
+						style="display: none;"
+					>
+						<input type="hidden" name="id" value={team.id} />
+					</form>
+					
 					<!-- Team Header -->
 					<div class="mb-4 flex items-center justify-between">
 						<div class="flex items-center gap-4">
@@ -168,19 +182,14 @@
 									<form 
 										method="POST" 
 										action="?/updateCapacity" 
-										use:optimisticEnhance={(
-											// eslint-disable-next-line @typescript-eslint/no-explicit-any
-											data: any, 
-											formData: FormData
-										) => {
+										use:optimisticEnhance={(data, input) => {
 											// Optimistically update the data
-											const teamId = formData.get('teamId') as string;
-											const yearMonth = formData.get('yearMonth') as string;
-											const newCapacity = parseFloat(formData.get('capacity') as string);
+											const teamId = input.formData.get('teamId') as string;
+											const yearMonth = input.formData.get('yearMonth') as string;
+											const newCapacity = parseFloat(input.formData.get('capacity') as string);
 											
 											if (data.initialState) {
-												// eslint-disable-next-line @typescript-eslint/no-explicit-any
-												const teamIndex = data.initialState.teams.findIndex((t: any) => t.id === teamId);
+												const teamIndex = data.initialState.teams.findIndex((t: Team) => t.id === teamId);
 												if (teamIndex !== -1) {
 													const team = data.initialState.teams[teamIndex];
 													const defaultCapacity = team.monthlyCapacityInPersonMonths;
@@ -188,8 +197,7 @@
 													if (newCapacity !== defaultCapacity) {
 														// Add or update override
 														const overrides = team.capacityOverrides || [];
-														// eslint-disable-next-line @typescript-eslint/no-explicit-any
-														const overrideIndex = overrides.findIndex((o: any) => o.yearMonth === yearMonth);
+														const overrideIndex = overrides.findIndex((o: { yearMonth: string; capacity: number }) => o.yearMonth === yearMonth);
 														
 														if (overrideIndex !== -1) {
 															overrides[overrideIndex].capacity = newCapacity;
@@ -202,8 +210,7 @@
 														// Remove override if it matches default
 														if (team.capacityOverrides) {
 															data.initialState.teams[teamIndex].capacityOverrides = 
-																// eslint-disable-next-line @typescript-eslint/no-explicit-any
-																team.capacityOverrides.filter((o: any) => o.yearMonth !== yearMonth);
+																team.capacityOverrides.filter((o: { yearMonth: string; capacity: number }) => o.yearMonth !== yearMonth);
 														}
 													}
 												}
@@ -241,17 +248,57 @@
 
 <Modal bind:open={showAddModal} title={editingTeam ? 'Edit Team' : 'Add Team'} onClose={closeModal}>
 	<form
-		onsubmit={(e) => {
+		bind:this={teamFormRef}
+		method="POST"
+		action={editingTeam ? '?/updateTeam' : '?/createTeam'}
+		use:optimisticEnhance={(data, input) => {
+			// Optimistically update the data
+			const name = input.formData.get('name') as string;
+			const monthlyCapacity = parseFloat(input.formData.get('monthlyCapacity') as string);
+			
+			if (data.initialState) {
+				if (editingTeam) {
+					// Update existing team
+					const teamIndex = data.initialState.teams.findIndex((t: Team) => t.id === editingTeam);
+					if (teamIndex !== -1) {
+						data.initialState.teams[teamIndex] = {
+							...data.initialState.teams[teamIndex],
+							name,
+							monthlyCapacityInPersonMonths: monthlyCapacity
+						};
+					}
+				} else {
+					// Add new team
+					const newTeam: Team = {
+						id: crypto.randomUUID(),
+						name,
+						monthlyCapacityInPersonMonths: monthlyCapacity,
+						capacityOverrides: []
+					};
+					data.initialState.teams.push(newTeam);
+				}
+			}
+		}}
+		onsubmit={(e: SubmitEvent) => {
 			e.preventDefault();
-			handleSubmit();
+			if (!validateForm()) return;
+			
+			// Let the form submit naturally with optimisticEnhance
+			(e.currentTarget as HTMLFormElement).requestSubmit();
+			closeModal();
 		}}
 	>
+		{#if editingTeam}
+			<input type="hidden" name="id" value={editingTeam} />
+		{/if}
+		
 		<div class="mb-4">
 			<label for="team-name" class="mb-1 block text-sm font-medium text-gray-700">
 				Team Name
 			</label>
 			<input
 				id="team-name"
+				name="name"
 				type="text"
 				bind:value={formName}
 				class="w-full rounded border px-3 py-2 focus:outline-none focus:ring-1 {nameError
@@ -269,6 +316,7 @@
 			</label>
 			<input
 				id="team-capacity"
+				name="monthlyCapacity"
 				type="number"
 				step="0.1"
 				min="0.1"

@@ -51,7 +51,7 @@ export const updateWorkPackageSchema = z.object({
 export const capacityOverrideSchema = z.object({
 	teamId: z.uuid(),
 	yearMonth: yearMonth,
-	capacity: positiveNumber
+	capacity: z.number().nonnegative() // Allow zero for months with no capacity (e.g., holidays)
 });
 
 /**

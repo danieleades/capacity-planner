@@ -1,15 +1,14 @@
 <script lang="ts">
 	import { appState, workPackages } from '$lib/stores/appState';
+	import type { WorkPackage, PlanningPageData } from '$lib/types';
+	import type { OptimisticEnhanceAction } from '$lib/types/optimistic';
 	import Modal from './Modal.svelte';
 	import WorkPackageForm from './WorkPackageForm.svelte';
 
 	interface Props {
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		optimisticEnhance: any;
+		optimisticEnhance: OptimisticEnhanceAction<PlanningPageData>;
 	}
 
-	// optimisticEnhance is passed but not used yet - components use store directly
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	let { optimisticEnhance }: Props = $props();
 
 	let showAddModal = $state(false);
@@ -17,6 +16,8 @@
 	let formTitle = $state('');
 	let formSize = $state(0);
 	let formDescription = $state('');
+	let workPackageFormRef = $state<HTMLFormElement | null>(null);
+	let deleteFormRefs: Record<string, HTMLFormElement | null> = {};
 
 	function openAddModal() {
 		formTitle = '';
@@ -46,22 +47,24 @@
 	}
 
 	function handleSubmit(title: string, size: number, description?: string) {
-		if (editingWorkPackage) {
-			appState.updateWorkPackage(editingWorkPackage, {
-				title,
-				sizeInPersonMonths: size,
-				description,
-			});
-		} else {
-			appState.addWorkPackage(title, size, description);
-		}
-
+		// Update form values and submit the form to trigger server action
+		formTitle = title;
+		formSize = size;
+		formDescription = description || '';
+		
+		// Submit the form
+		workPackageFormRef?.requestSubmit();
+		
+		// Close modal after submission
 		closeModal();
 	}
 
 	function handleDelete(workPackageId: string) {
 		if (confirm('Are you sure you want to delete this work package?')) {
-			appState.deleteWorkPackage(workPackageId);
+			const form = deleteFormRefs[workPackageId];
+			if (form) {
+				form.requestSubmit();
+			}
 		}
 	}
 </script>
@@ -80,6 +83,27 @@
 	{#if $workPackages.length === 0}
 		<p class="text-gray-500">No work packages yet. Add one to get started.</p>
 	{:else}
+		<!-- Hidden delete forms for each work package -->
+		{#each $workPackages as wp (wp.id)}
+			<form
+				bind:this={deleteFormRefs[wp.id]}
+				method="POST"
+				action="?/deleteWorkPackage"
+				use:optimisticEnhance={(data, input) => {
+					// Optimistically remove the work package
+					const workPackageId = input.formData.get('id') as string;
+					
+					if (data.initialState) {
+						// Remove work package from array
+						data.initialState.workPackages = data.initialState.workPackages.filter((wp: WorkPackage) => wp.id !== workPackageId);
+					}
+				}}
+				style="display: none;"
+			>
+				<input type="hidden" name="id" value={wp.id} />
+			</form>
+		{/each}
+		
 		<div class="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
 			<table class="w-full">
 				<thead class="border-b border-gray-200 bg-gray-50">
@@ -156,12 +180,59 @@
 	title={editingWorkPackage ? 'Edit Work Package' : 'Add Work Package'}
 	onClose={closeModal}
 >
-	<WorkPackageForm
-		bind:title={formTitle}
-		bind:size={formSize}
-		bind:description={formDescription}
-		isEditing={!!editingWorkPackage}
-		onSubmit={handleSubmit}
-		onCancel={closeModal}
-	/>
+	<form
+		bind:this={workPackageFormRef}
+		method="POST"
+		action={editingWorkPackage ? '?/updateWorkPackage' : '?/createWorkPackage'}
+		use:optimisticEnhance={(data, input) => {
+			// Optimistically update the data
+			const title = input.formData.get('title') as string;
+			const sizeInPersonMonths = parseFloat(input.formData.get('sizeInPersonMonths') as string);
+			const description = input.formData.get('description') as string | null;
+			
+			if (data.initialState) {
+				if (editingWorkPackage) {
+					// Update existing work package
+					const wpIndex = data.initialState.workPackages.findIndex((wp: WorkPackage) => wp.id === editingWorkPackage);
+					if (wpIndex !== -1) {
+						data.initialState.workPackages[wpIndex] = {
+							...data.initialState.workPackages[wpIndex],
+							title,
+							sizeInPersonMonths,
+							description: description || undefined
+						};
+					}
+				} else {
+					// Add new work package
+					const newWorkPackage: WorkPackage = {
+						id: crypto.randomUUID(),
+						title,
+						sizeInPersonMonths,
+						description: description || undefined,
+						priority: data.initialState.workPackages.length,
+						assignedTeamId: undefined
+					};
+					data.initialState.workPackages.push(newWorkPackage);
+				}
+			}
+		}}
+		onsubmit={(e: SubmitEvent) => {
+			e.preventDefault();
+			// Validation will be done by WorkPackageForm, then it calls handleSubmit
+		}}
+	>
+		{#if editingWorkPackage}
+			<input type="hidden" name="id" value={editingWorkPackage} />
+		{/if}
+		<input type="hidden" name="priority" value={$workPackages.length} />
+		
+		<WorkPackageForm
+			bind:title={formTitle}
+			bind:size={formSize}
+			bind:description={formDescription}
+			isEditing={!!editingWorkPackage}
+			onSubmit={handleSubmit}
+			onCancel={closeModal}
+		/>
+	</form>
 </Modal>

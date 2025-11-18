@@ -27,6 +27,14 @@ export interface AppState {
 	teams: Team[];
 }
 
+/**
+ * Page data shape for the planning route
+ * This is the canonical type that the route's load function returns
+ */
+export interface PlanningPageData {
+	initialState: AppState;
+}
+
 // Zod schemas for validation
 export const MonthlyCapacitySchema = z.object({
 	yearMonth: z.string().regex(/^\d{4}-\d{2}$/, 'Must be in YYYY-MM format'),

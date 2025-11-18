@@ -1,24 +1,22 @@
 <script lang="ts">
 	import { dndzone } from 'svelte-dnd-action';
-	import { appState, teams } from '$lib/stores/appState';
+	import { appState, teams, workPackages } from '$lib/stores/appState';
 	import {
 		calculateTeamBacklog,
 		formatMonths,
 		formatDate,
 		type TeamBacklogMetrics,
 	} from '$lib/utils/capacity';
-	import type { WorkPackage, Team } from '$lib/types';
+	import type { WorkPackage, Team, PlanningPageData } from '$lib/types';
+	import type { OptimisticEnhanceAction } from '$lib/types/optimistic';
 	import Modal from './Modal.svelte';
 	import CapacitySparkline from './CapacitySparkline.svelte';
 	import WorkPackageForm from './WorkPackageForm.svelte';
 
 	interface Props {
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		optimisticEnhance: any;
+		optimisticEnhance: OptimisticEnhanceAction<PlanningPageData>;
 	}
 
-	// optimisticEnhance is passed but not used yet - drag-and-drop uses direct fetch
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	let { optimisticEnhance }: Props = $props();
 
 	const flipDurationMs = 200;
@@ -29,6 +27,7 @@
 	let formTitle = $state('');
 	let formSize = $state(0);
 	let formDescription = $state('');
+	let workPackageFormRef = $state<HTMLFormElement | null>(null);
 
 	function openAddModal() {
 		formTitle = '';
@@ -47,16 +46,15 @@
 	}
 
 	function handleSubmit(title: string, size: number, description?: string) {
-		if (editingWorkPackage) {
-			appState.updateWorkPackage(editingWorkPackage, {
-				title,
-				sizeInPersonMonths: size,
-				description,
-			});
-		} else {
-			appState.addWorkPackage(title, size, description);
-		}
-
+		// Update form values and submit the form to trigger server action
+		formTitle = title;
+		formSize = size;
+		formDescription = description || '';
+		
+		// Submit the form
+		workPackageFormRef?.requestSubmit();
+		
+		// Close modal after submission
 		closeModal();
 	}
 
@@ -74,7 +72,10 @@
 
 	// Helper function to build columns from store data
 	// Sort by scheduledPosition (for board planning) with fallback to priority
-	// Optimized to pre-group work packages once instead of filtering per team
+	// 
+	// Performance optimization: Pre-groups work packages by team in O(n) time,
+	// then passes pre-filtered arrays to calculateTeamBacklog to avoid redundant
+	// O(n) filtering per team. This reduces complexity from O(teams × packages) to O(packages).
 	function buildColumns(): Column[] {
 		const sortByScheduledPosition = (items: WorkPackage[]) =>
 			items.sort((a, b) => {
@@ -105,7 +106,9 @@
 
 		for (const team of $teams) {
 			const teamWPs = workPackagesByTeam.get(team.id) || [];
-			const metrics = calculateTeamBacklog(team, $appState.workPackages);
+			// Pass preFiltered=true since teamWPs is already filtered for this team
+			// This avoids redundant O(n) filtering inside calculateTeamBacklog
+			const metrics = calculateTeamBacklog(team, teamWPs, true);
 
 			cols.push({
 				id: team.id,
@@ -158,19 +161,22 @@
 			return col;
 		});
 
-		// Update both team assignment AND scheduledPosition
-		// scheduledPosition is the board view ordering (persistent, for planning/phasing)
-		// priority remains unchanged (that's the global canonical ordering)
-		const scheduledPositionMap = new Map(items.map((wp, index) => [wp.id, index]));
+		// Collect all updates for the batch request
+		const updates = items.map((wp, index) => ({
+			id: wp.id,
+			teamId: newTeamId ?? null,
+			position: index
+		}));
 
 		// Optimistically update the store
 		appState.update((state) => {
 			const updatedWorkPackages = state.workPackages.map((wp) => {
-				if (scheduledPositionMap.has(wp.id)) {
+				const update = updates.find((u) => u.id === wp.id);
+				if (update) {
 					return {
 						...wp,
-						assignedTeamId: newTeamId,
-						scheduledPosition: scheduledPositionMap.get(wp.id)!,
+						assignedTeamId: update.teamId ?? undefined,
+						scheduledPosition: update.position,
 					};
 				}
 				return wp;
@@ -182,24 +188,17 @@
 			};
 		});
 
-		// Submit form to persist changes to server
-		// For each work package that was moved, submit an assignment form
-		items.forEach((wp, index) => {
-			submitAssignmentForm(wp.id, newTeamId, index);
-		});
+		// Submit single batch request to persist all changes
+		submitBatchReorder(updates);
 	}
 
-	// Helper function to submit work package assignment to server
-	async function submitAssignmentForm(workPackageId: string, teamId: string | undefined, position: number) {
+	// Helper function to submit batch reorder to server
+	async function submitBatchReorder(updates: Array<{ id: string; teamId: string | null; position: number }>) {
 		const formData = new FormData();
-		formData.append('workPackageId', workPackageId);
-		if (teamId) {
-			formData.append('teamId', teamId);
-		}
-		formData.append('position', position.toString());
+		formData.append('updates', JSON.stringify(updates));
 
 		try {
-			const response = await fetch('?/assignWorkPackage', {
+			const response = await fetch('?/reorderWorkPackages', {
 				method: 'POST',
 				body: formData
 			});
@@ -207,14 +206,14 @@
 			const result = await response.json();
 			
 			if (result.type === 'failure') {
-				const errorMsg = result.data?.details || result.data?.error || 'Failed to assign work package';
-				console.error('Failed to assign work package:', errorMsg);
+				const errorMsg = result.data?.details || result.data?.error || 'Failed to reorder work packages';
+				console.error('Failed to reorder work packages:', errorMsg);
 				
-				// Show error message to user
+				// Show error message to user with retry functionality
 				const windowWithHandler = window as Window & { handleFormError?: (msg: string, retry?: () => void) => void };
 				if (typeof window !== 'undefined' && windowWithHandler.handleFormError) {
 					windowWithHandler.handleFormError(errorMsg, () => {
-						window.location.reload();
+						submitBatchReorder(updates);
 					});
 				} else {
 					// Fallback: reload to revert optimistic update
@@ -222,14 +221,14 @@
 				}
 			}
 		} catch (error) {
-			const errorMsg = error instanceof Error ? error.message : 'Failed to assign work package';
-			console.error('Failed to assign work package:', errorMsg);
+			const errorMsg = error instanceof Error ? error.message : 'Failed to reorder work packages';
+			console.error('Failed to reorder work packages:', errorMsg);
 			
-			// Show error message to user
+			// Show error message to user with retry functionality
 			const windowWithHandler = window as Window & { handleFormError?: (msg: string, retry?: () => void) => void };
 			if (typeof window !== 'undefined' && windowWithHandler.handleFormError) {
 				windowWithHandler.handleFormError(errorMsg, () => {
-					window.location.reload();
+					submitBatchReorder(updates);
 				});
 			} else {
 				// Fallback: reload to revert optimistic update
@@ -361,12 +360,60 @@
 	title={editingWorkPackage ? 'Edit Work Package' : 'Add Work Package'}
 	onClose={closeModal}
 >
-	<WorkPackageForm
-		bind:title={formTitle}
-		bind:size={formSize}
-		bind:description={formDescription}
-		isEditing={!!editingWorkPackage}
-		onSubmit={handleSubmit}
-		onCancel={closeModal}
-	/>
+	<form
+		bind:this={workPackageFormRef}
+		method="POST"
+		action={editingWorkPackage ? '?/updateWorkPackage' : '?/createWorkPackage'}
+		use:optimisticEnhance={(data, input) => {
+			// Optimistically update the data
+			const title = input.formData.get('title') as string;
+			const sizeInPersonMonths = parseFloat(input.formData.get('sizeInPersonMonths') as string);
+			const description = input.formData.get('description') as string | null;
+			
+			if (data.initialState) {
+				if (editingWorkPackage) {
+					// Update existing work package
+					const wpIndex = data.initialState.workPackages.findIndex((wp: WorkPackage) => wp.id === editingWorkPackage);
+					if (wpIndex !== -1) {
+						data.initialState.workPackages[wpIndex] = {
+							...data.initialState.workPackages[wpIndex],
+							title,
+							sizeInPersonMonths,
+							description: description || undefined
+						};
+					}
+				} else {
+					// Add new work package
+					const newWorkPackage: WorkPackage = {
+						id: crypto.randomUUID(),
+						title,
+						sizeInPersonMonths,
+						description: description || undefined,
+						priority: data.initialState.workPackages.length,
+						assignedTeamId: undefined,
+						scheduledPosition: undefined
+					};
+					data.initialState.workPackages.push(newWorkPackage);
+				}
+			}
+		}}
+		onsubmit={(e: SubmitEvent) => {
+			e.preventDefault();
+			// Validation will be done by WorkPackageForm, then it calls handleSubmit
+		}}
+	>
+		{#if editingWorkPackage}
+			<input type="hidden" name="id" value={editingWorkPackage} />
+		{/if}
+		<input type="hidden" name="priority" value={$workPackages.length} />
+		
+		<WorkPackageForm
+			bind:title={formTitle}
+			bind:size={formSize}
+			bind:description={formDescription}
+			isEditing={!!editingWorkPackage}
+			onSubmit={handleSubmit}
+			onCancel={closeModal}
+		/>
+	</form>
 </Modal>
