@@ -25,12 +25,12 @@ export const updateTeamSchema = z.object({
 
 /**
  * Work package creation validation schema
+ * Note: priority is computed server-side and not part of input validation
  */
 export const createWorkPackageSchema = z.object({
 	title: z.string().min(1).max(200),
 	description: z.string().max(1000).optional(),
-	sizeInPersonMonths: positiveNumber,
-	priority: nonNegativeInt
+	sizeInPersonMonths: positiveNumber
 });
 
 /**

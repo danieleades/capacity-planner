@@ -1,6 +1,6 @@
 import { db as defaultDb } from '../db';
 import { workPackages } from '../schema';
-import { eq } from 'drizzle-orm';
+import { eq, sql, isNull } from 'drizzle-orm';
 import type { WorkPackage, NewWorkPackage, WorkPackageUpdate, DbParam } from './types';
 import { workPackageValidation, handleValidationError } from '../validation';
 import { withTimestamps, withUpdatedTimestamp, dbOperation } from './db-helpers';
@@ -14,7 +14,8 @@ export type UpdateWorkPackageInput = WorkPackageUpdate;
 
 /**
  * Create a new work package with UUID generation and validation
- * @param input - Work package creation data
+ * Priority is computed server-side using MAX(priority) + 1 to ensure uniqueness
+ * @param input - Work package creation data (priority is computed, not provided)
  * @param db - Database instance (defaults to main db)
  * @returns Object containing the generated work package ID
  */
@@ -22,22 +23,35 @@ export async function createWorkPackage(
 	input: CreateWorkPackageInput,
 	db: DbParam = defaultDb
 ): Promise<{ id: string }> {
-	return dbOperation(async () => {
-		try {
+	return dbOperation(() => {
+		// Use a transaction to ensure atomic priority assignment
+		// This prevents race conditions where two concurrent creates get the same priority
+		const result = db.transaction((tx) => {
+			// Compute next priority within transaction using tx handle
+			const maxPriorityResult = tx
+				.select({ maxPriority: sql<number>`COALESCE(MAX(priority), -1)` })
+				.from(workPackages)
+				.get();
+			
+			const priority = (maxPriorityResult?.maxPriority ?? -1) + 1;
+			
+			// Validate input
 			const validated = workPackageValidation.create.parse(input);
+			
 			const workPackageData = withTimestamps({
 				...validated,
 				description: validated.description ?? null,
+				priority,
 				assignedTeamId: null,
 				scheduledPosition: null
 			});
 
-			await db.insert(workPackages).values(workPackageData);
+			tx.insert(workPackages).values(workPackageData).run();
 
 			return { id: workPackageData.id };
-		} catch (error) {
-			handleValidationError(error, 'create work package');
-		}
+		});
+		
+		return result;
 	}, 'Failed to create work package');
 }
 
@@ -153,4 +167,18 @@ export async function reorderWorkPackages(
 			}
 		});
 	}, 'Failed to reorder work packages');
+}
+
+/**
+ * Clear scheduled positions for all unassigned work packages
+ * This makes them fall back to priority-based sorting
+ * @param db - Database instance (defaults to main db)
+ */
+export async function clearUnassignedPositions(db: DbParam = defaultDb): Promise<void> {
+	return dbOperation(() => {
+		db.update(workPackages)
+			.set({ scheduledPosition: null })
+			.where(isNull(workPackages.assignedTeamId))
+			.run();
+	}, 'Failed to clear unassigned positions');
 }

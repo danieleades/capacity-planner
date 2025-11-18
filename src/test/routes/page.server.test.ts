@@ -132,7 +132,6 @@ describe('Planning Page Routes', () => {
 				{
 					title: 'Test Work Package',
 					sizeInPersonMonths: 2.0,
-					priority: 1
 				},
 				testDb
 			);
@@ -192,7 +191,6 @@ describe('Planning Page Routes', () => {
 					title: 'Test Work Package',
 					description: 'Test description',
 					sizeInPersonMonths: 2.0,
-					priority: 0
 				},
 				testDb
 			);
@@ -326,7 +324,6 @@ describe('Planning Page Routes', () => {
 				{
 					title: 'Test Work Package',
 					sizeInPersonMonths: 2.0,
-					priority: 1
 				},
 				testDb
 			);
@@ -364,7 +361,6 @@ describe('Planning Page Routes', () => {
 				{
 					title: 'Test Work Package',
 					sizeInPersonMonths: 2.0,
-					priority: 1
 				},
 				testDb
 			);
@@ -417,7 +413,6 @@ describe('Planning Page Routes', () => {
 				{
 					title: 'Test Work Package',
 					sizeInPersonMonths: 2.0,
-					priority: 1
 				},
 				testDb
 			);
@@ -439,7 +434,6 @@ describe('Planning Page Routes', () => {
 				{
 					title: 'Test Work Package',
 					sizeInPersonMonths: 2.0,
-					priority: 1
 				},
 				testDb
 			);
@@ -524,26 +518,12 @@ describe('Planning Page Routes', () => {
 			const formData = new FormData();
 			formData.set('title', 'New Work Package');
 			formData.set('sizeInPersonMonths', 'invalid');
-			formData.set('priority', '1');
 
 			const mockEvent = createMockRequest(formData);
 			const result = await actions.createWorkPackage(mockEvent as Parameters<typeof actions.createWorkPackage>[0]);
 
 			expect(result).toHaveProperty('status', 400);
 			expectErrorMessage(result, 'Invalid size');
-		});
-
-		it('should return error when priority is invalid', async () => {
-			const formData = new FormData();
-			formData.set('title', 'New Work Package');
-			formData.set('sizeInPersonMonths', '2.5');
-			formData.set('priority', 'invalid');
-
-			const mockEvent = createMockRequest(formData);
-			const result = await actions.createWorkPackage(mockEvent as Parameters<typeof actions.createWorkPackage>[0]);
-
-			expect(result).toHaveProperty('status', 400);
-			expectErrorMessage(result, 'Invalid priority');
 		});
 	});
 
@@ -553,7 +533,6 @@ describe('Planning Page Routes', () => {
 				{
 					title: 'Test Work Package',
 					sizeInPersonMonths: 2.0,
-					priority: 1
 				},
 				testDb
 			);
@@ -713,7 +692,6 @@ describe('Planning Page Routes', () => {
 				{
 					title: 'Test Work Package',
 					sizeInPersonMonths: 2.0,
-					priority: 1
 				},
 				testDb
 			);
@@ -827,6 +805,257 @@ describe('Planning Page Routes', () => {
 
 			expect(result).toHaveProperty('status', 400);
 			expectErrorMessage(result, 'Invalid capacity value');
+		});
+	});
+
+	describe('scheduledPosition preservation', () => {
+		it('should preserve scheduledPosition of 0 through load function round-trip', async () => {
+			const team = await createTeam(
+				{
+					name: 'Test Team',
+					monthlyCapacity: 3.0
+				},
+				testDb
+			);
+
+			const wp = await createWorkPackage(
+				{
+					title: 'First Work Package',
+					sizeInPersonMonths: 2.0,
+				},
+				testDb
+			);
+
+			// Assign work package to team at position 0 (first position)
+			await assignWorkPackage(wp.id, team.id, 0, testDb);
+
+			// Load the data through the load function
+			const result = await load({} as Parameters<typeof load>[0]);
+
+			if (!result || !('initialState' in result)) {
+				throw new Error('Expected initialState in result');
+			}
+
+			// Find the work package in the loaded data
+			const loadedWorkPackage = result.initialState.workPackages.find((w: WorkPackage) => w.id === wp.id);
+			
+			expect(loadedWorkPackage).toBeDefined();
+			expect(loadedWorkPackage?.scheduledPosition).toBe(0);
+			expect(loadedWorkPackage?.assignedTeamId).toBe(team.id);
+		});
+
+		it('should preserve scheduledPosition of 0 for unassigned work packages', async () => {
+			const wp = await createWorkPackage(
+				{
+					title: 'Unassigned Work Package',
+					sizeInPersonMonths: 2.0,
+				},
+				testDb
+			);
+
+			// Manually set scheduledPosition to 0 for unassigned work package
+			// This simulates a work package that was previously assigned and then unassigned
+			const { workPackages } = await import('$lib/server/schema');
+			const { eq } = await import('drizzle-orm');
+			
+			testDb.update(workPackages)
+				.set({ scheduledPosition: 0 })
+				.where(eq(workPackages.id, wp.id))
+				.run();
+
+			// Load the data through the load function
+			const result = await load({} as Parameters<typeof load>[0]);
+
+			if (!result || !('initialState' in result)) {
+				throw new Error('Expected initialState in result');
+			}
+
+			// Find the work package in the loaded data
+			const loadedWorkPackage = result.initialState.workPackages.find((w: WorkPackage) => w.id === wp.id);
+			
+			expect(loadedWorkPackage).toBeDefined();
+			expect(loadedWorkPackage?.scheduledPosition).toBe(0);
+			expect(loadedWorkPackage?.assignedTeamId).toBeUndefined();
+		});
+
+		it('should convert null scheduledPosition to undefined', async () => {
+			const wp = await createWorkPackage(
+				{
+					title: 'Work Package with null position',
+					sizeInPersonMonths: 2.0,
+				},
+				testDb
+			);
+
+			// Work packages created without assignment have null scheduledPosition by default
+
+			// Load the data through the load function
+			const result = await load({} as Parameters<typeof load>[0]);
+
+			if (!result || !('initialState' in result)) {
+				throw new Error('Expected initialState in result');
+			}
+
+			// Find the work package in the loaded data
+			const loadedWorkPackage = result.initialState.workPackages.find((w: WorkPackage) => w.id === wp.id);
+			
+			expect(loadedWorkPackage).toBeDefined();
+			expect(loadedWorkPackage?.scheduledPosition).toBeUndefined();
+		});
+	});
+
+	describe('priority behavior', () => {
+		it('should not change priority when editing work package', async () => {
+			const wp = await createWorkPackage(
+				{
+					title: 'Original Title',
+					sizeInPersonMonths: 2.0
+				},
+				testDb
+			);
+
+			// Get the original priority
+			const loadResult = await load({} as Parameters<typeof load>[0]);
+			if (!loadResult || !('initialState' in loadResult)) {
+				throw new Error('Expected initialState in result');
+			}
+			const originalWorkPackage = loadResult.initialState.workPackages.find((w: WorkPackage) => w.id === wp.id);
+			const originalPriority = originalWorkPackage?.priority;
+
+			// Update the work package
+			const formData = new FormData();
+			formData.set('id', wp.id);
+			formData.set('title', 'Updated Title');
+			formData.set('sizeInPersonMonths', '3.5');
+
+			const mockEvent = createMockRequest(formData);
+			await actions.updateWorkPackage(mockEvent as Parameters<typeof actions.updateWorkPackage>[0]);
+
+			// Verify priority hasn't changed
+			const updatedResult = await load({} as Parameters<typeof load>[0]);
+			if (!updatedResult || !('initialState' in updatedResult)) {
+				throw new Error('Expected initialState in result');
+			}
+			const updatedWorkPackage = updatedResult.initialState.workPackages.find((w: WorkPackage) => w.id === wp.id);
+			
+			expect(updatedWorkPackage?.priority).toBe(originalPriority);
+			expect(updatedWorkPackage?.title).toBe('Updated Title');
+			expect(updatedWorkPackage?.sizeInPersonMonths).toBe(3.5);
+		});
+
+		it('should assign unique priority when creating work package', async () => {
+			// Create first work package
+			const formData1 = new FormData();
+			formData1.set('title', 'First Work Package');
+			formData1.set('sizeInPersonMonths', '2.0');
+
+			const mockEvent1 = createMockRequest(formData1);
+			await actions.createWorkPackage(mockEvent1 as Parameters<typeof actions.createWorkPackage>[0]);
+
+			// Create second work package
+			const formData2 = new FormData();
+			formData2.set('title', 'Second Work Package');
+			formData2.set('sizeInPersonMonths', '3.0');
+
+			const mockEvent2 = createMockRequest(formData2);
+			await actions.createWorkPackage(mockEvent2 as Parameters<typeof actions.createWorkPackage>[0]);
+
+			// Verify both have unique priorities
+			const result = await load({} as Parameters<typeof load>[0]);
+			if (!result || !('initialState' in result)) {
+				throw new Error('Expected initialState in result');
+			}
+
+			expect(result.initialState.workPackages).toHaveLength(2);
+			const priorities = result.initialState.workPackages.map((wp: WorkPackage) => wp.priority);
+			
+			// Check that priorities are unique
+			const uniquePriorities = new Set(priorities);
+			expect(uniquePriorities.size).toBe(2);
+			
+			// Check that priorities are sequential
+			expect(priorities).toContain(0);
+			expect(priorities).toContain(1);
+		});
+
+		it('should not reuse priorities after deletions', async () => {
+			// Create three work packages
+			const formData1 = new FormData();
+			formData1.set('title', 'First Work Package');
+			formData1.set('sizeInPersonMonths', '2.0');
+
+			const mockEvent1 = createMockRequest(formData1);
+			const result1 = await actions.createWorkPackage(mockEvent1 as Parameters<typeof actions.createWorkPackage>[0]);
+
+			const formData2 = new FormData();
+			formData2.set('title', 'Second Work Package');
+			formData2.set('sizeInPersonMonths', '3.0');
+
+			const mockEvent2 = createMockRequest(formData2);
+			await actions.createWorkPackage(mockEvent2 as Parameters<typeof actions.createWorkPackage>[0]);
+
+			const formData3 = new FormData();
+			formData3.set('title', 'Third Work Package');
+			formData3.set('sizeInPersonMonths', '1.5');
+
+			const mockEvent3 = createMockRequest(formData3);
+			await actions.createWorkPackage(mockEvent3 as Parameters<typeof actions.createWorkPackage>[0]);
+
+			// Delete the first work package
+			if (result1 && typeof result1 === 'object' && 'id' in result1) {
+				const deleteFormData = new FormData();
+				deleteFormData.set('id', result1.id as string);
+
+				const deleteMockEvent = createMockRequest(deleteFormData);
+				await actions.deleteWorkPackage(deleteMockEvent as Parameters<typeof actions.deleteWorkPackage>[0]);
+			}
+
+			// Create a new work package after deletion
+			const formData4 = new FormData();
+			formData4.set('title', 'Fourth Work Package');
+			formData4.set('sizeInPersonMonths', '2.5');
+
+			const mockEvent4 = createMockRequest(formData4);
+			await actions.createWorkPackage(mockEvent4 as Parameters<typeof actions.createWorkPackage>[0]);
+
+			// Verify the new work package has priority 3 (not reusing 0)
+			const result = await load({} as Parameters<typeof load>[0]);
+			if (!result || !('initialState' in result)) {
+				throw new Error('Expected initialState in result');
+			}
+
+			const fourthWorkPackage = result.initialState.workPackages.find((wp: WorkPackage) => wp.title === 'Fourth Work Package');
+			expect(fourthWorkPackage?.priority).toBe(3);
+		});
+
+		it('should ensure all priority values are unique with no duplicates', async () => {
+			// Create multiple work packages
+			const titles = ['WP1', 'WP2', 'WP3', 'WP4', 'WP5'];
+			
+			for (const title of titles) {
+				const formData = new FormData();
+				formData.set('title', title);
+				formData.set('sizeInPersonMonths', '2.0');
+
+				const mockEvent = createMockRequest(formData);
+				await actions.createWorkPackage(mockEvent as Parameters<typeof actions.createWorkPackage>[0]);
+			}
+
+			// Verify all priorities are unique
+			const result = await load({} as Parameters<typeof load>[0]);
+			if (!result || !('initialState' in result)) {
+				throw new Error('Expected initialState in result');
+			}
+
+			expect(result.initialState.workPackages).toHaveLength(5);
+			const priorities = result.initialState.workPackages.map((wp: WorkPackage) => wp.priority);
+			
+			// Check that all priorities are unique
+			const uniquePriorities = new Set(priorities);
+			expect(uniquePriorities.size).toBe(5);
+			
+			// Check that priorities are sequential starting from 0
+			expect(priorities.sort()).toEqual([0, 1, 2, 3, 4]);
 		});
 	});
 });

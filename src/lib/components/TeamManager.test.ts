@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
 import TeamManager from './TeamManager.svelte';
-import { appState } from '$lib/stores/appState';
+import { createAppStore, createDerivedStores } from '$lib/stores/appState';
 import type { OptimisticEnhanceAction } from '$lib/types/optimistic';
 import type { PlanningPageData } from '$lib/types';
 
@@ -13,21 +13,32 @@ describe('TeamManager', () => {
 		};
 	}) as unknown as OptimisticEnhanceAction<PlanningPageData>;
 
+	let appState: ReturnType<typeof createAppStore>;
+	let teams: ReturnType<typeof createDerivedStores>['teams'];
+
 	beforeEach(() => {
-		// Reset store using appState.set()
-		appState.set({ teams: [], workPackages: [] });
+		// Create fresh store instances for each test
+		appState = createAppStore({ teams: [], workPackages: [] });
+		const derivedStores = createDerivedStores(appState);
+		teams = derivedStores.teams;
 		vi.clearAllMocks();
 	});
 
 	describe('form submissions', () => {
 		it('should render add team button', () => {
-			render(TeamManager, { props: { optimisticEnhance: mockOptimisticEnhance } });
+			render(TeamManager, {
+				props: { optimisticEnhance: mockOptimisticEnhance },
+				context: new Map<string, unknown>([['teams', teams]])
+			});
 			
 			expect(screen.getByText('+ Add Team')).toBeInTheDocument();
 		});
 
 		it('should have form with createTeam action', async () => {
-			const { container } = render(TeamManager, { props: { optimisticEnhance: mockOptimisticEnhance } });
+			const { container } = render(TeamManager, {
+				props: { optimisticEnhance: mockOptimisticEnhance },
+				context: new Map<string, unknown>([['teams', teams]])
+			});
 			
 			// Open modal
 			const addButton = screen.getByText('+ Add Team');
@@ -52,7 +63,10 @@ describe('TeamManager', () => {
 				workPackages: []
 			});
 
-			render(TeamManager, { props: { optimisticEnhance: mockOptimisticEnhance } });
+			render(TeamManager, {
+				props: { optimisticEnhance: mockOptimisticEnhance },
+				context: new Map<string, unknown>([['teams', teams]])
+			});
 			
 			expect(screen.getByText('Engineering Team')).toBeInTheDocument();
 			expect(screen.getByText(/5 PM\/month/i)).toBeInTheDocument();
@@ -71,7 +85,10 @@ describe('TeamManager', () => {
 				workPackages: []
 			});
 
-			render(TeamManager, { props: { optimisticEnhance: mockOptimisticEnhance } });
+			render(TeamManager, {
+				props: { optimisticEnhance: mockOptimisticEnhance },
+				context: new Map<string, unknown>([['teams', teams]])
+			});
 			
 			const deleteForm = document.getElementById('delete-form-team-1');
 			expect(deleteForm).toBeInTheDocument();
@@ -92,7 +109,10 @@ describe('TeamManager', () => {
 				workPackages: []
 			});
 
-			const { container } = render(TeamManager, { props: { optimisticEnhance: mockOptimisticEnhance } });
+			const { container } = render(TeamManager, {
+				props: { optimisticEnhance: mockOptimisticEnhance },
+				context: new Map<string, unknown>([['teams', teams]])
+			});
 			
 			// Find capacity input forms
 			const capacityForms = container.querySelectorAll('form[action="?/updateCapacity"]');
@@ -112,7 +132,10 @@ describe('TeamManager', () => {
 				workPackages: []
 			});
 
-			const { container } = render(TeamManager, { props: { optimisticEnhance: mockOptimisticEnhance } });
+			const { container } = render(TeamManager, {
+				props: { optimisticEnhance: mockOptimisticEnhance },
+				context: new Map<string, unknown>([['teams', teams]])
+			});
 			
 			// Open edit modal
 			const editButton = screen.getByLabelText('Edit team');

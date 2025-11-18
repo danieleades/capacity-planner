@@ -1,6 +1,8 @@
 <script lang="ts">
+	import { getContext } from 'svelte';
+	import type { Readable } from 'svelte/store';
 	import { dndzone } from 'svelte-dnd-action';
-	import { appState, teams, workPackages } from '$lib/stores/appState';
+	import { createAppStore } from '$lib/stores/appState';
 	import {
 		calculateTeamBacklog,
 		formatMonths,
@@ -9,9 +11,8 @@
 	} from '$lib/utils/capacity';
 	import type { WorkPackage, Team, PlanningPageData } from '$lib/types';
 	import type { OptimisticEnhanceAction } from '$lib/types/optimistic';
-	import Modal from './Modal.svelte';
 	import CapacitySparkline from './CapacitySparkline.svelte';
-	import WorkPackageForm from './WorkPackageForm.svelte';
+	import WorkPackageModal from './WorkPackageModal.svelte';
 
 	interface Props {
 		optimisticEnhance: OptimisticEnhanceAction<PlanningPageData>;
@@ -19,43 +20,24 @@
 
 	let { optimisticEnhance }: Props = $props();
 
+	// Get stores from context
+	const appState = getContext<ReturnType<typeof createAppStore>>('appState');
+	const teams = getContext<Readable<Team[]>>('teams');
+
 	const flipDurationMs = 200;
 
-	// Work package form state
+	// Modal state
 	let showAddModal = $state(false);
-	let editingWorkPackage = $state<string | null>(null);
-	let formTitle = $state('');
-	let formSize = $state(0);
-	let formDescription = $state('');
-	let workPackageFormRef = $state<HTMLFormElement | null>(null);
+	let editingWorkPackage = $state<WorkPackage | undefined>(undefined);
 
 	function openAddModal() {
-		formTitle = '';
-		formSize = 0;
-		formDescription = '';
-		editingWorkPackage = null;
+		editingWorkPackage = undefined;
 		showAddModal = true;
 	}
 
 	function closeModal() {
 		showAddModal = false;
-		editingWorkPackage = null;
-		formTitle = '';
-		formSize = 0;
-		formDescription = '';
-	}
-
-	function handleSubmit(title: string, size: number, description?: string) {
-		// Update form values and submit the form to trigger server action
-		formTitle = title;
-		formSize = size;
-		formDescription = description || '';
-		
-		// Submit the form
-		workPackageFormRef?.requestSubmit();
-		
-		// Close modal after submission
-		closeModal();
+		editingWorkPackage = undefined;
 	}
 
 	interface Column {
@@ -253,9 +235,8 @@
 		}
 	}
 
-	function reorderByPriority() {
-		// Clear scheduledPosition for all unassigned work packages
-		// This makes them fall back to priority ordering
+	async function reorderByPriority() {
+		// Optimistically clear scheduledPosition for unassigned work packages
 		appState.update((state) => {
 			const updatedWorkPackages = state.workPackages.map((wp) => {
 				if (!wp.assignedTeamId) {
@@ -270,6 +251,39 @@
 				workPackages: updatedWorkPackages,
 			};
 		});
+
+		// Persist to server using dedicated action
+		try {
+			const response = await fetch('?/clearUnassignedPositions', {
+				method: 'POST',
+				body: new FormData()
+			});
+
+			const result = await response.json();
+			
+			if (result.type === 'failure') {
+				const errorMsg = result.data?.details || result.data?.error || 'Failed to reset to priority order';
+				console.error('Failed to reset to priority order:', errorMsg);
+				
+				// Show error and reload to revert optimistic update
+				const windowWithHandler = window as Window & { handleFormError?: (msg: string, retry?: () => void) => void };
+				if (typeof window !== 'undefined' && windowWithHandler.handleFormError) {
+					windowWithHandler.handleFormError(errorMsg, reorderByPriority);
+				} else {
+					window.location.reload();
+				}
+			}
+		} catch (error) {
+			const errorMsg = error instanceof Error ? error.message : 'Failed to reset to priority order';
+			console.error('Failed to reset to priority order:', errorMsg);
+			
+			const windowWithHandler = window as Window & { handleFormError?: (msg: string, retry?: () => void) => void };
+			if (typeof window !== 'undefined' && windowWithHandler.handleFormError) {
+				windowWithHandler.handleFormError(errorMsg, reorderByPriority);
+			} else {
+				window.location.reload();
+			}
+		}
 	}
 </script>
 
@@ -371,65 +385,9 @@
 	</div>
 </div>
 
-<Modal
+<WorkPackageModal
+	{optimisticEnhance}
 	bind:open={showAddModal}
-	title={editingWorkPackage ? 'Edit Work Package' : 'Add Work Package'}
+	editingWorkPackage={editingWorkPackage}
 	onClose={closeModal}
->
-	<form
-		bind:this={workPackageFormRef}
-		method="POST"
-		action={editingWorkPackage ? '?/updateWorkPackage' : '?/createWorkPackage'}
-		use:optimisticEnhance={(data, input) => {
-			// Optimistically update the data
-			const title = input.formData.get('title') as string;
-			const sizeInPersonMonths = parseFloat(input.formData.get('sizeInPersonMonths') as string);
-			const description = input.formData.get('description') as string | null;
-			
-			if (data.initialState) {
-				if (editingWorkPackage) {
-					// Update existing work package
-					const wpIndex = data.initialState.workPackages.findIndex((wp: WorkPackage) => wp.id === editingWorkPackage);
-					if (wpIndex !== -1) {
-						data.initialState.workPackages[wpIndex] = {
-							...data.initialState.workPackages[wpIndex],
-							title,
-							sizeInPersonMonths,
-							description: description || undefined
-						};
-					}
-				} else {
-					// Add new work package
-					const newWorkPackage: WorkPackage = {
-						id: crypto.randomUUID(),
-						title,
-						sizeInPersonMonths,
-						description: description || undefined,
-						priority: data.initialState.workPackages.length,
-						assignedTeamId: undefined,
-						scheduledPosition: undefined
-					};
-					data.initialState.workPackages.push(newWorkPackage);
-				}
-			}
-		}}
-		onsubmit={(e: SubmitEvent) => {
-			e.preventDefault();
-			// Validation will be done by WorkPackageForm, then it calls handleSubmit
-		}}
-	>
-		{#if editingWorkPackage}
-			<input type="hidden" name="id" value={editingWorkPackage} />
-		{/if}
-		<input type="hidden" name="priority" value={$workPackages.length} />
-		
-		<WorkPackageForm
-			bind:title={formTitle}
-			bind:size={formSize}
-			bind:description={formDescription}
-			isEditing={!!editingWorkPackage}
-			onSubmit={handleSubmit}
-			onCancel={closeModal}
-		/>
-	</form>
-</Modal>
+/>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { setContext } from 'svelte';
 	import { page } from '$app/stores';
 	import { optimistikit } from 'optimistikit';
 	import { enhance as svelteKitEnhance } from '$app/forms';
@@ -7,7 +8,7 @@
 	import KanbanBoard from '$lib/components/KanbanBoard.svelte';
 	import WorkPackagesTable from '$lib/components/WorkPackagesTable.svelte';
 	import ErrorBanner from '$lib/components/ErrorBanner.svelte';
-	import { appState } from '$lib/stores/appState';
+	import { createAppStore, createDerivedStores } from '$lib/stores/appState';
 
 	// Use $props to get page data instead of $page store
 	const { data }: { data: PageData } = $props();
@@ -16,9 +17,15 @@
 	let errorMessage = $state<string>('');
 	let lastFailedAction = $state<(() => void) | null>(null);
 
-	// Initialize appState store immediately with server data before first render
-	// This ensures SSR hydration works correctly without content flash
-	appState.set(data.initialState);
+	// Create per-request store instance
+	const appState = createAppStore(data.initialState);
+	const { teams, workPackages, unassignedWorkPackages } = createDerivedStores(appState);
+
+	// Make stores available to child components via context
+	setContext('appState', appState);
+	setContext('teams', teams);
+	setContext('workPackages', workPackages);
+	setContext('unassignedWorkPackages', unassignedWorkPackages);
 
 	// Wrap page data with optimistikit() to enable optimistic updates
 	// We only need the enhance function, not the optimistic data

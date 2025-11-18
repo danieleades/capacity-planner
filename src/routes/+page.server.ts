@@ -16,6 +16,7 @@ import {
 	updateTeam,
 	deleteTeam
 } from '$lib/server/repositories/teams.repository';
+import { clearUnassignedPositions } from '$lib/server/repositories/work-packages.repository';
 
 /**
  * Format error messages for user-friendly display
@@ -51,7 +52,7 @@ export const load: PageServerLoad = async () => {
 				sizeInPersonMonths: wp.sizeInPersonMonths,
 				priority: wp.priority,
 				assignedTeamId: undefined,
-				scheduledPosition: wp.scheduledPosition || undefined
+				scheduledPosition: wp.scheduledPosition ?? undefined
 			})),
 			...planningView.teams.flatMap(team => 
 				team.workPackages.map(wp => ({
@@ -61,7 +62,7 @@ export const load: PageServerLoad = async () => {
 					sizeInPersonMonths: wp.sizeInPersonMonths,
 					priority: wp.priority,
 					assignedTeamId: team.id,
-					scheduledPosition: wp.scheduledPosition || undefined
+					scheduledPosition: wp.scheduledPosition ?? undefined
 				}))
 			)
 		];
@@ -189,7 +190,6 @@ export const actions: Actions = {
 				title?: string;
 				description?: string | null;
 				sizeInPersonMonths?: number;
-				priority?: number;
 			} = {};
 
 			const title = data.get('title') as string | null;
@@ -220,18 +220,6 @@ export const actions: Actions = {
 				updateData.sizeInPersonMonths = size;
 			}
 
-			const priorityStr = data.get('priority') as string | null;
-			if (priorityStr !== null) {
-				const priority = parseInt(priorityStr, 10);
-				if (isNaN(priority) || priority < 0) {
-					return fail(400, {
-						error: 'Invalid priority',
-						details: 'Priority must be a non-negative integer'
-					});
-				}
-				updateData.priority = priority;
-			}
-
 			await updateWorkPackage(id, updateData);
 			return { success: true };
 		} catch (error) {
@@ -249,12 +237,11 @@ export const actions: Actions = {
 			const title = data.get('title') as string;
 			const description = data.get('description') as string | null;
 			const sizeStr = data.get('sizeInPersonMonths') as string;
-			const priorityStr = data.get('priority') as string;
 
-			if (!title || !sizeStr || !priorityStr) {
+			if (!title || !sizeStr) {
 				return fail(400, {
 					error: 'Missing required fields',
-					details: 'Title, size, and priority are required'
+					details: 'Title and size are required'
 				});
 			}
 
@@ -273,19 +260,10 @@ export const actions: Actions = {
 				});
 			}
 
-			const priority = parseInt(priorityStr, 10);
-			if (isNaN(priority) || priority < 0) {
-				return fail(400, {
-					error: 'Invalid priority',
-					details: 'Priority must be a non-negative integer'
-				});
-			}
-
 			const result = await createWorkPackage({
 				title: title.trim(),
 				description: description?.trim() || undefined,
-				sizeInPersonMonths,
-				priority
+				sizeInPersonMonths
 			});
 
 			return { success: true, id: result.id };
@@ -496,6 +474,19 @@ export const actions: Actions = {
 			console.error('Failed to reorder work packages:', error);
 			return fail(500, {
 				error: 'Failed to reorder work packages',
+				details: formatErrorMessage(error)
+			});
+		}
+	},
+
+	clearUnassignedPositions: async () => {
+		try {
+			await clearUnassignedPositions();
+			return { success: true };
+		} catch (error) {
+			console.error('Failed to clear unassigned positions:', error);
+			return fail(500, {
+				error: 'Failed to reset to priority order',
 				details: formatErrorMessage(error)
 			});
 		}

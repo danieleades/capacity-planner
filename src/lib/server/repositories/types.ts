@@ -16,7 +16,7 @@ export type CapacityOverride = InferSelectModel<typeof capacityOverrides>;
 export type NewTeam = Omit<InferInsertModel<typeof teams>, 'id' | 'createdAt' | 'updatedAt'>;
 export type NewWorkPackage = Omit<
 	InferInsertModel<typeof workPackages>,
-	'id' | 'createdAt' | 'updatedAt'
+	'id' | 'createdAt' | 'updatedAt' | 'priority'
 >;
 export type NewCapacityOverride = Omit<
 	InferInsertModel<typeof capacityOverrides>,

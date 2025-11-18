@@ -81,7 +81,6 @@ describe('planning repository', () => {
 				{
 					title: 'Feature C',
 					sizeInPersonMonths: 1.0,
-					priority: 3
 				},
 				db
 			);
@@ -90,7 +89,6 @@ describe('planning repository', () => {
 				{
 					title: 'Feature A',
 					sizeInPersonMonths: 2.0,
-					priority: 1
 				},
 				db
 			);
@@ -99,7 +97,6 @@ describe('planning repository', () => {
 				{
 					title: 'Feature B',
 					sizeInPersonMonths: 1.5,
-					priority: 2
 				},
 				db
 			);
@@ -107,10 +104,14 @@ describe('planning repository', () => {
 			const view = getPlanningView(db);
 
 			expect(view.unassignedWorkPackages).toHaveLength(3);
-			expect(view.unassignedWorkPackages[0].title).toBe('Feature A');
-			expect(view.unassignedWorkPackages[0].priority).toBe(1);
-			expect(view.unassignedWorkPackages[1].title).toBe('Feature B');
-			expect(view.unassignedWorkPackages[2].title).toBe('Feature C');
+			// Priorities are auto-assigned in creation order (0, 1, 2)
+			// So they should be sorted in creation order
+			expect(view.unassignedWorkPackages[0].title).toBe('Feature C');
+			expect(view.unassignedWorkPackages[0].priority).toBe(0);
+			expect(view.unassignedWorkPackages[1].title).toBe('Feature A');
+			expect(view.unassignedWorkPackages[1].priority).toBe(1);
+			expect(view.unassignedWorkPackages[2].title).toBe('Feature B');
+			expect(view.unassignedWorkPackages[2].priority).toBe(2);
 		});
 
 		it('should assign work packages to correct teams', async () => {
@@ -134,7 +135,6 @@ describe('planning repository', () => {
 				{
 					title: 'Feature 1',
 					sizeInPersonMonths: 2.0,
-					priority: 1
 				},
 				db
 			);
@@ -143,7 +143,6 @@ describe('planning repository', () => {
 				{
 					title: 'Feature 2',
 					sizeInPersonMonths: 1.5,
-					priority: 2
 				},
 				db
 			);
@@ -173,7 +172,6 @@ describe('planning repository', () => {
 				{
 					title: 'Feature 1',
 					sizeInPersonMonths: 1.0,
-					priority: 1
 				},
 				db
 			);
@@ -182,7 +180,6 @@ describe('planning repository', () => {
 				{
 					title: 'Feature 2',
 					sizeInPersonMonths: 1.0,
-					priority: 2
 				},
 				db
 			);
@@ -191,7 +188,6 @@ describe('planning repository', () => {
 				{
 					title: 'Feature 3',
 					sizeInPersonMonths: 1.0,
-					priority: 3
 				},
 				db
 			);
@@ -225,7 +221,6 @@ describe('planning repository', () => {
 				{
 					title: 'Feature 1',
 					sizeInPersonMonths: 1.0,
-					priority: 1
 				},
 				db
 			);
@@ -234,7 +229,6 @@ describe('planning repository', () => {
 				{
 					title: 'Feature 2',
 					sizeInPersonMonths: 1.0,
-					priority: 2
 				},
 				db
 			);
@@ -273,7 +267,6 @@ describe('planning repository', () => {
 					title: 'Assigned to A',
 					description: 'Work for team A',
 					sizeInPersonMonths: 2.0,
-					priority: 1
 				},
 				db
 			);
@@ -282,7 +275,6 @@ describe('planning repository', () => {
 				{
 					title: 'Assigned to B',
 					sizeInPersonMonths: 1.5,
-					priority: 2
 				},
 				db
 			);
@@ -291,7 +283,6 @@ describe('planning repository', () => {
 				{
 					title: 'Unassigned',
 					sizeInPersonMonths: 1.0,
-					priority: 3
 				},
 				db
 			);

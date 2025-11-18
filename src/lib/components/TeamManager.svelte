@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { teams } from '$lib/stores/appState';
+	import { getContext } from 'svelte';
+	import type { Readable } from 'svelte/store';
 	import type { OptimisticEnhanceAction } from '$lib/types/optimistic';
 	import type { Team, WorkPackage, PlanningPageData } from '$lib/types';
 	import Modal from './Modal.svelte';
@@ -12,6 +13,9 @@
 	}
 
 	let { optimisticEnhance }: Props = $props();
+
+	// Get stores from context
+	const teams = getContext<Readable<Team[]>>('teams');
 
 	let showAddModal = $state(false);
 	let editingTeam = $state<string | null>(null);
@@ -65,11 +69,11 @@
 			isValid = false;
 		}
 
-		if (formCapacity <= 0) {
-			capacityError = 'Capacity must be greater than 0';
-			isValid = false;
-		} else if (isNaN(formCapacity)) {
+		if (isNaN(formCapacity)) {
 			capacityError = 'Capacity must be a valid number';
+			isValid = false;
+		} else if (formCapacity <= 0) {
+			capacityError = 'Capacity must be greater than 0';
 			isValid = false;
 		}
 
@@ -116,9 +120,9 @@
 								// Remove team from teams array
 								data.initialState.teams = data.initialState.teams.filter((t: Team) => t.id !== teamId);
 								
-								// Unassign work packages from this team
+								// Unassign work packages from this team and clear scheduledPosition
 								data.initialState.workPackages = data.initialState.workPackages.map((wp: WorkPackage) =>
-									wp.assignedTeamId === teamId ? { ...wp, assignedTeamId: undefined } : wp
+									wp.assignedTeamId === teamId ? { ...wp, assignedTeamId: undefined, scheduledPosition: undefined } : wp
 								);
 							}
 						}}
@@ -318,6 +322,10 @@
 				step="0.1"
 				min="0.1"
 				bind:value={formCapacity}
+				oninput={(e) => {
+					const target = e.currentTarget as HTMLInputElement;
+					formCapacity = target.valueAsNumber;
+				}}
 				class="w-full rounded border px-3 py-2 focus:outline-none focus:ring-1 {capacityError
 					? 'border-red-300 focus:border-red-500 focus:ring-red-500'
 					: 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'}"

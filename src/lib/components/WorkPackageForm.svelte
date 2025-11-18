@@ -29,11 +29,11 @@
 			isValid = false;
 		}
 
-		if (size <= 0) {
-			sizeError = 'Size must be greater than 0';
-			isValid = false;
-		} else if (isNaN(size)) {
+		if (isNaN(size)) {
 			sizeError = 'Size must be a valid number';
+			isValid = false;
+		} else if (size <= 0) {
+			sizeError = 'Size must be greater than 0';
 			isValid = false;
 		}
 
@@ -68,6 +68,10 @@
 		step="0.1"
 		min="0.1"
 		bind:value={size}
+		oninput={(e) => {
+			const target = e.currentTarget as HTMLInputElement;
+			size = target.valueAsNumber;
+		}}
 		class="w-full rounded border px-3 py-2 focus:outline-none focus:ring-1 {sizeError
 			? 'border-red-300 focus:border-red-500 focus:ring-red-500'
 			: 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'}"

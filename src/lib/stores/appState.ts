@@ -3,7 +3,7 @@ import type { WorkPackage, Team, AppState } from '$lib/types';
 import * as ops from './operations';
 
 // Create the main state store
-const createAppStore = (initialState?: AppState) => {
+export const createAppStore = (initialState?: AppState) => {
 	// Initialize with provided state or empty state
 	const { subscribe, update, set } = writable<AppState>(
 		initialState || { teams: [], workPackages: [] }
@@ -55,16 +55,17 @@ const createAppStore = (initialState?: AppState) => {
 	};
 };
 
-// Create the app state store (will be initialized from page with server data)
-export const appState = createAppStore();
+// Create derived stores from an app state store instance
+export const createDerivedStores = (appState: ReturnType<typeof createAppStore>) => {
+	const teams = derived(appState, ($state) => $state.teams);
 
-// Derived stores for easier access
-export const teams = derived(appState, ($state) => $state.teams);
+	const workPackages = derived(appState, ($state) =>
+		[...$state.workPackages].sort((a, b) => a.priority - b.priority)
+	);
 
-export const workPackages = derived(appState, ($state) =>
-	[...$state.workPackages].sort((a, b) => a.priority - b.priority)
-);
+	const unassignedWorkPackages = derived(appState, ($state) =>
+		$state.workPackages.filter((wp) => !wp.assignedTeamId).sort((a, b) => a.priority - b.priority)
+	);
 
-export const unassignedWorkPackages = derived(appState, ($state) =>
-	$state.workPackages.filter((wp) => !wp.assignedTeamId).sort((a, b) => a.priority - b.priority)
-);
+	return { teams, workPackages, unassignedWorkPackages };
+};

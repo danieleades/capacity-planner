@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
 import KanbanBoard from './KanbanBoard.svelte';
-import { appState } from '$lib/stores/appState';
+import { createAppStore, createDerivedStores } from '$lib/stores/appState';
 import type { OptimisticEnhanceAction } from '$lib/types/optimistic';
-import type { PlanningPageData } from '$lib/types';
+import type { PlanningPageData, AppState } from '$lib/types';
 
 // Mock fetch for drag-and-drop tests
 global.fetch = vi.fn();
@@ -16,25 +16,37 @@ describe('KanbanBoard', () => {
 		};
 	}) as unknown as OptimisticEnhanceAction<PlanningPageData>;
 
+	let initialState: AppState;
+
 	beforeEach(() => {
-		// Reset stores
-		appState.set({
+		// Reset initial state
+		initialState = {
 			teams: [],
 			workPackages: []
-		});
+		};
 		vi.clearAllMocks();
 	});
 
 	describe('drag-and-drop persistence', () => {
 		it('should render unassigned column', () => {
-			render(KanbanBoard, { props: { optimisticEnhance: mockOptimisticEnhance } });
+			const appState = createAppStore(initialState);
+			const { teams, workPackages, unassignedWorkPackages } = createDerivedStores(appState);
+			render(KanbanBoard, { 
+				props: { optimisticEnhance: mockOptimisticEnhance },
+				context: new Map<string, unknown>([
+					['appState', appState],
+					['teams', teams],
+					['workPackages', workPackages],
+					['unassignedWorkPackages', unassignedWorkPackages]
+				])
+			});
 			
 			expect(screen.getByText('Unassigned')).toBeInTheDocument();
 		});
 
 		it('should not send server request when finalize event has empty items array', async () => {
 			// Setup: Create a component with work packages
-			appState.set({
+			initialState = {
 				teams: [
 					{
 						id: 'team-1',
@@ -54,9 +66,19 @@ describe('KanbanBoard', () => {
 						scheduledPosition: 0
 					}
 				]
-			});
+			};
 
-			const { container } = render(KanbanBoard, { props: { optimisticEnhance: mockOptimisticEnhance } });
+			const appState = createAppStore(initialState);
+			const { teams, workPackages, unassignedWorkPackages } = createDerivedStores(appState);
+			const { container } = render(KanbanBoard, { 
+				props: { optimisticEnhance: mockOptimisticEnhance },
+				context: new Map<string, unknown>([
+					['appState', appState],
+					['teams', teams],
+					['workPackages', workPackages],
+					['unassignedWorkPackages', unassignedWorkPackages]
+				])
+			});
 
 			// Simulate svelte-dnd-action finalize event with empty items array
 			// This happens when the last item is dragged out of a column (origin zone event)
@@ -88,7 +110,7 @@ describe('KanbanBoard', () => {
 		});
 
 		it('should render team columns', () => {
-			appState.set({
+			initialState = {
 				teams: [
 					{
 						id: 'team-1',
@@ -98,15 +120,25 @@ describe('KanbanBoard', () => {
 					}
 				],
 				workPackages: []
-			});
+			};
 
-			render(KanbanBoard, { props: { optimisticEnhance: mockOptimisticEnhance } });
+			const appState = createAppStore(initialState);
+			const { teams, workPackages, unassignedWorkPackages } = createDerivedStores(appState);
+			render(KanbanBoard, { 
+				props: { optimisticEnhance: mockOptimisticEnhance },
+				context: new Map<string, unknown>([
+					['appState', appState],
+					['teams', teams],
+					['workPackages', workPackages],
+					['unassignedWorkPackages', unassignedWorkPackages]
+				])
+			});
 			
 			expect(screen.getByText('Engineering Team')).toBeInTheDocument();
 		});
 
 		it('should display assigned work packages', () => {
-			appState.set({
+			initialState = {
 				teams: [
 					{
 						id: 'team-1',
@@ -126,9 +158,19 @@ describe('KanbanBoard', () => {
 						scheduledPosition: 0
 					}
 				]
-			});
+			};
 
-			render(KanbanBoard, { props: { optimisticEnhance: mockOptimisticEnhance } });
+			const appState = createAppStore(initialState);
+			const { teams, workPackages, unassignedWorkPackages } = createDerivedStores(appState);
+			render(KanbanBoard, { 
+				props: { optimisticEnhance: mockOptimisticEnhance },
+				context: new Map<string, unknown>([
+					['appState', appState],
+					['teams', teams],
+					['workPackages', workPackages],
+					['unassignedWorkPackages', unassignedWorkPackages]
+				])
+			});
 			
 			expect(screen.getByText('Assigned Work')).toBeInTheDocument();
 		});
@@ -138,7 +180,17 @@ describe('KanbanBoard', () => {
 		it('should use window.handleFormError for drag-and-drop errors', () => {
 			// This test verifies the error handling mechanism exists
 			// The actual error handling is tested in integration tests
-			render(KanbanBoard, { props: { optimisticEnhance: mockOptimisticEnhance } });
+			const appState = createAppStore(initialState);
+			const { teams, workPackages, unassignedWorkPackages } = createDerivedStores(appState);
+			render(KanbanBoard, { 
+				props: { optimisticEnhance: mockOptimisticEnhance },
+				context: new Map<string, unknown>([
+					['appState', appState],
+					['teams', teams],
+					['workPackages', workPackages],
+					['unassignedWorkPackages', unassignedWorkPackages]
+				])
+			});
 			
 			// Verify component renders (error handling is internal)
 			expect(screen.getByText('Unassigned')).toBeInTheDocument();
@@ -147,14 +199,34 @@ describe('KanbanBoard', () => {
 
 	describe('work package form', () => {
 		it('should have add button in unassigned column', () => {
-			render(KanbanBoard, { props: { optimisticEnhance: mockOptimisticEnhance } });
+			const appState = createAppStore(initialState);
+			const { teams, workPackages, unassignedWorkPackages } = createDerivedStores(appState);
+			render(KanbanBoard, { 
+				props: { optimisticEnhance: mockOptimisticEnhance },
+				context: new Map<string, unknown>([
+					['appState', appState],
+					['teams', teams],
+					['workPackages', workPackages],
+					['unassignedWorkPackages', unassignedWorkPackages]
+				])
+			});
 			
 			const addButton = screen.getByText('+ Add');
 			expect(addButton).toBeInTheDocument();
 		});
 
 		it('should have form with createWorkPackage action', async () => {
-			const { container } = render(KanbanBoard, { props: { optimisticEnhance: mockOptimisticEnhance } });
+			const appState = createAppStore(initialState);
+			const { teams, workPackages, unassignedWorkPackages } = createDerivedStores(appState);
+			const { container } = render(KanbanBoard, { 
+				props: { optimisticEnhance: mockOptimisticEnhance },
+				context: new Map<string, unknown>([
+					['appState', appState],
+					['teams', teams],
+					['workPackages', workPackages],
+					['unassignedWorkPackages', unassignedWorkPackages]
+				])
+			});
 			
 			// Open modal
 			const addButton = screen.getByText('+ Add');

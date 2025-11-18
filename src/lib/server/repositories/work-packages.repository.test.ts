@@ -28,7 +28,6 @@ describe('work packages repository', () => {
 					title: 'Feature A',
 					description: 'Build feature A',
 					sizeInPersonMonths: 2.5,
-					priority: 1
 				},
 				db
 			);
@@ -40,7 +39,8 @@ describe('work packages repository', () => {
 			expect(wp.title).toBe('Feature A');
 			expect(wp.description).toBe('Build feature A');
 			expect(wp.sizeInPersonMonths).toBe(2.5);
-			expect(wp.priority).toBe(1);
+			// Priority is auto-assigned starting from 0 for the first work package
+			expect(wp.priority).toBe(0);
 			expect(wp.assignedTeamId).toBeNull();
 			expect(wp.scheduledPosition).toBeNull();
 			expect(wp.createdAt).toBeInstanceOf(Date);
@@ -52,7 +52,6 @@ describe('work packages repository', () => {
 				{
 					title: 'Feature B',
 					sizeInPersonMonths: 1.0,
-					priority: 2
 				},
 				db
 			);
@@ -67,7 +66,6 @@ describe('work packages repository', () => {
 					{
 						title: '',
 						sizeInPersonMonths: 2.0,
-						priority: 1
 					},
 					db
 				)
@@ -80,7 +78,6 @@ describe('work packages repository', () => {
 					{
 						title: 'Feature',
 						sizeInPersonMonths: -1,
-						priority: 1
 					},
 					db
 				)
@@ -94,7 +91,6 @@ describe('work packages repository', () => {
 				{
 					title: 'Old Title',
 					sizeInPersonMonths: 2.0,
-					priority: 1
 				},
 				db
 			);
@@ -110,7 +106,6 @@ describe('work packages repository', () => {
 				{
 					title: 'Feature',
 					sizeInPersonMonths: 2.0,
-					priority: 1
 				},
 				db
 			);
@@ -126,7 +121,6 @@ describe('work packages repository', () => {
 				{
 					title: 'Feature',
 					sizeInPersonMonths: 2.0,
-					priority: 1
 				},
 				db
 			);
@@ -147,7 +141,6 @@ describe('work packages repository', () => {
 				{
 					title: 'Feature',
 					sizeInPersonMonths: 2.0,
-					priority: 1
 				},
 				db
 			);
@@ -165,7 +158,6 @@ describe('work packages repository', () => {
 				{
 					title: 'To Delete',
 					sizeInPersonMonths: 1.0,
-					priority: 1
 				},
 				db
 			);
@@ -191,7 +183,6 @@ describe('work packages repository', () => {
 				{
 					title: 'Feature',
 					sizeInPersonMonths: 2.0,
-					priority: 1
 				},
 				db
 			);
@@ -224,7 +215,6 @@ describe('work packages repository', () => {
 				{
 					title: 'Feature',
 					sizeInPersonMonths: 2.0,
-					priority: 1
 				},
 				db
 			);
@@ -252,7 +242,6 @@ describe('work packages repository', () => {
 				{
 					title: 'Feature',
 					sizeInPersonMonths: 2.0,
-					priority: 1
 				},
 				db
 			);
@@ -270,7 +259,6 @@ describe('work packages repository', () => {
 				{
 					title: 'Feature',
 					sizeInPersonMonths: 2.0,
-					priority: 1
 				},
 				db
 			);
