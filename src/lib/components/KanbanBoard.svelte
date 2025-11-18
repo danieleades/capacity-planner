@@ -12,6 +12,15 @@
 	import CapacitySparkline from './CapacitySparkline.svelte';
 	import WorkPackageForm from './WorkPackageForm.svelte';
 
+	interface Props {
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		optimisticEnhance: any;
+	}
+
+	// optimisticEnhance is passed but not used yet - drag-and-drop uses direct fetch
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
+	let { optimisticEnhance }: Props = $props();
+
 	const flipDurationMs = 200;
 
 	// Work package form state
@@ -154,6 +163,7 @@
 		// priority remains unchanged (that's the global canonical ordering)
 		const scheduledPositionMap = new Map(items.map((wp, index) => [wp.id, index]));
 
+		// Optimistically update the store
 		appState.update((state) => {
 			const updatedWorkPackages = state.workPackages.map((wp) => {
 				if (scheduledPositionMap.has(wp.id)) {
@@ -171,6 +181,41 @@
 				workPackages: updatedWorkPackages,
 			};
 		});
+
+		// Submit form to persist changes to server
+		// For each work package that was moved, submit an assignment form
+		items.forEach((wp, index) => {
+			submitAssignmentForm(wp.id, newTeamId, index);
+		});
+	}
+
+	// Helper function to submit work package assignment to server
+	async function submitAssignmentForm(workPackageId: string, teamId: string | undefined, position: number) {
+		const formData = new FormData();
+		formData.append('workPackageId', workPackageId);
+		if (teamId) {
+			formData.append('teamId', teamId);
+		}
+		formData.append('position', position.toString());
+
+		try {
+			const response = await fetch('?/assignWorkPackage', {
+				method: 'POST',
+				body: formData
+			});
+
+			const result = await response.json();
+			
+			if (result.type === 'failure') {
+				console.error('Failed to assign work package:', result.data?.error);
+				// Reload to revert optimistic update
+				window.location.reload();
+			}
+		} catch (error) {
+			console.error('Failed to assign work package:', error);
+			// Reload to revert optimistic update
+			window.location.reload();
+		}
 	}
 
 	function reorderByPriority() {
@@ -179,8 +224,7 @@
 		appState.update((state) => {
 			const updatedWorkPackages = state.workPackages.map((wp) => {
 				if (!wp.assignedTeamId) {
-					// eslint-disable-next-line @typescript-eslint/no-unused-vars
-					const { scheduledPosition, ...rest } = wp;
+					const { scheduledPosition: _scheduledPosition, ...rest } = wp;
 					return rest;
 				}
 				return wp;

@@ -4,6 +4,13 @@
 	import CapacitySparkline from './CapacitySparkline.svelte';
 	import { getNextMonths, formatYearMonth } from '$lib/utils/dates';
 
+	interface Props {
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		optimisticEnhance: any;
+	}
+
+	let { optimisticEnhance }: Props = $props();
+
 	let showAddModal = $state(false);
 	let editingTeam = $state<string | null>(null);
 	let formName = $state('');
@@ -124,23 +131,70 @@
 									<label for="capacity-{team.id}-{yearMonth}" class="block text-xs font-medium text-gray-600">
 										{formatYearMonth(yearMonth)}
 									</label>
-									<input
-										id="capacity-{team.id}-{yearMonth}"
-										type="number"
-										step="0.1"
-										min="0"
-										value={capacity}
-										onchange={(e) => {
-											const newCapacity = e.currentTarget.valueAsNumber;
-											if (isNaN(newCapacity) || newCapacity < 0) return;
-											if (newCapacity !== team.monthlyCapacityInPersonMonths) {
-												appState.setMonthlyCapacity(team.id, yearMonth, newCapacity);
-											} else {
-												appState.clearMonthlyCapacity(team.id, yearMonth);
+									<form 
+										method="POST" 
+										action="?/updateCapacity" 
+										use:optimisticEnhance={(
+											// eslint-disable-next-line @typescript-eslint/no-explicit-any
+											data: any, 
+											formData: FormData
+										) => {
+											// Optimistically update the data
+											const teamId = formData.get('teamId') as string;
+											const yearMonth = formData.get('yearMonth') as string;
+											const newCapacity = parseFloat(formData.get('capacity') as string);
+											
+											if (data.initialState) {
+												// eslint-disable-next-line @typescript-eslint/no-explicit-any
+												const teamIndex = data.initialState.teams.findIndex((t: any) => t.id === teamId);
+												if (teamIndex !== -1) {
+													const team = data.initialState.teams[teamIndex];
+													const defaultCapacity = team.monthlyCapacityInPersonMonths;
+													
+													if (newCapacity !== defaultCapacity) {
+														// Add or update override
+														const overrides = team.capacityOverrides || [];
+														// eslint-disable-next-line @typescript-eslint/no-explicit-any
+														const overrideIndex = overrides.findIndex((o: any) => o.yearMonth === yearMonth);
+														
+														if (overrideIndex !== -1) {
+															overrides[overrideIndex].capacity = newCapacity;
+														} else {
+															overrides.push({ yearMonth, capacity: newCapacity });
+														}
+														
+														data.initialState.teams[teamIndex].capacityOverrides = overrides;
+													} else {
+														// Remove override if it matches default
+														if (team.capacityOverrides) {
+															data.initialState.teams[teamIndex].capacityOverrides = 
+																// eslint-disable-next-line @typescript-eslint/no-explicit-any
+																team.capacityOverrides.filter((o: any) => o.yearMonth !== yearMonth);
+														}
+													}
+												}
 											}
 										}}
-										class="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-									/>
+									>
+										<input type="hidden" name="teamId" value={team.id} />
+										<input type="hidden" name="yearMonth" value={yearMonth} />
+										<input
+											id="capacity-{team.id}-{yearMonth}"
+											name="capacity"
+											type="number"
+											step="0.1"
+											min="0"
+											value={capacity}
+											onchange={(e) => {
+												const newCapacity = e.currentTarget.valueAsNumber;
+												if (isNaN(newCapacity) || newCapacity < 0) return;
+												
+												// Submit the form (optimistic update will happen automatically)
+												e.currentTarget.form?.requestSubmit();
+											}}
+											class="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+										/>
+									</form>
 								</div>
 							{/each}
 						</div>

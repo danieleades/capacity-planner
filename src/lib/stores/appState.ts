@@ -1,54 +1,6 @@
 import { writable, derived } from 'svelte/store';
 import type { WorkPackage, Team, AppState } from '$lib/types';
-import { browser } from '$app/environment';
-import { resolve } from '$app/paths';
 import * as ops from './operations';
-
-// Debounce timer for saving to server
-let saveTimeout: ReturnType<typeof setTimeout> | null = null;
-const SAVE_DEBOUNCE_MS = 1000;
-
-// Error store for save failures
-export const saveError = writable<string | null>(null);
-
-/**
- * Save state to server with debouncing
- */
-async function saveToServer(state: AppState) {
-	if (!browser) return;
-
-	try {
-		const response = await fetch(resolve('/api/state'), {
-			method: 'PUT',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(state)
-		});
-
-		if (!response.ok) {
-			const error = await response.json();
-			console.error('Failed to save state:', error);
-			saveError.set(error.error || 'Failed to save changes');
-		} else {
-			// Clear error on successful save
-			saveError.set(null);
-		}
-	} catch (error) {
-		console.error('Network error saving state:', error);
-		saveError.set('Network error: Unable to save changes');
-	}
-}
-
-/**
- * Debounced save function
- */
-function debouncedSave(state: AppState) {
-	if (saveTimeout) {
-		clearTimeout(saveTimeout);
-	}
-	saveTimeout = setTimeout(() => {
-		saveToServer(state);
-	}, SAVE_DEBOUNCE_MS);
-}
 
 // Create the main state store
 const createAppStore = (initialState?: AppState) => {
@@ -56,16 +8,6 @@ const createAppStore = (initialState?: AppState) => {
 	const { subscribe, update, set } = writable<AppState>(
 		initialState || { teams: [], workPackages: [] }
 	);
-
-	// Auto-save on every update (debounced), but skip the initial hydration
-	let isHydrated = false;
-	subscribe((state) => {
-		if (!isHydrated) {
-			isHydrated = true;
-			return; // Skip first emission from hydration
-		}
-		debouncedSave(state);
-	});
 
 	return {
 		subscribe,

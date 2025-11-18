@@ -3,6 +3,15 @@
 	import Modal from './Modal.svelte';
 	import WorkPackageForm from './WorkPackageForm.svelte';
 
+	interface Props {
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		optimisticEnhance: any;
+	}
+
+	// optimisticEnhance is passed but not used yet - components use store directly
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
+	let { optimisticEnhance }: Props = $props();
+
 	let showAddModal = $state(false);
 	let editingWorkPackage = $state<string | null>(null);
 	let formTitle = $state('');
@@ -84,9 +93,9 @@
 					</tr>
 				</thead>
 				<tbody>
-					{#each $workPackages as wp, index (wp.id)}
+					{#each $workPackages as wp (wp.id)}
 						<tr class="border-b border-gray-100 hover:bg-gray-50">
-							<td class="px-4 py-3 text-sm text-gray-900">{index + 1}</td>
+							<td class="px-4 py-3 text-sm text-gray-900">{wp.priority + 1}</td>
 							<td class="px-4 py-3 text-sm font-medium text-gray-900">{wp.title}</td>
 							<td class="px-4 py-3 text-sm text-gray-900">{wp.sizeInPersonMonths}</td>
 							<td class="px-4 py-3 text-sm text-gray-600">
