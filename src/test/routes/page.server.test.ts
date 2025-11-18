@@ -4,6 +4,7 @@ import { load, actions } from '../../routes/+page.server';
 import { createTeam, setCapacityOverride } from '$lib/server/repositories/teams.repository';
 import { createWorkPackage, assignWorkPackage } from '$lib/server/repositories/work-packages.repository';
 import type { RequestEvent } from '@sveltejs/kit';
+import type { WorkPackage } from '$lib/types';
 
 // Mock the repository modules to use our test database
 let testDb: ReturnType<typeof createTestDb>['db'];
@@ -88,15 +89,34 @@ describe('Planning Page Routes', () => {
 	});
 
 	describe('load function', () => {
+		it('should return initialState with teams and workPackages arrays matching PlanningPageData type', async () => {
+			const result = await load({} as Parameters<typeof load>[0]);
+
+			// Verify the result has the correct shape for PlanningPageData
+			expect(result).toBeDefined();
+			if (!result || !('initialState' in result)) {
+				throw new Error('Expected initialState in result');
+			}
+			expect(result).toHaveProperty('initialState');
+			expect(result.initialState).toHaveProperty('teams');
+			expect(result.initialState).toHaveProperty('workPackages');
+			
+			// Verify teams is an array
+			expect(Array.isArray(result.initialState.teams)).toBe(true);
+			
+			// Verify workPackages is an array
+			expect(Array.isArray(result.initialState.workPackages)).toBe(true);
+		});
+
 		it('should load empty planning view when no data exists', async () => {
 			const result = await load({} as Parameters<typeof load>[0]);
 
 			expect(result).toBeDefined();
-			if (!result || !('planningView' in result)) {
-				throw new Error('Expected planningView in result');
+			if (!result || !('initialState' in result)) {
+				throw new Error('Expected initialState in result');
 			}
-			expect(result.planningView.teams).toHaveLength(0);
-			expect(result.planningView.unassignedWorkPackages).toHaveLength(0);
+			expect(result.initialState.teams).toHaveLength(0);
+			expect(result.initialState.workPackages).toHaveLength(0);
 		});
 
 		it('should load planning view with teams and work packages', async () => {
@@ -121,13 +141,14 @@ describe('Planning Page Routes', () => {
 
 			const result = await load({} as Parameters<typeof load>[0]);
 
-			if (!result || !('planningView' in result)) {
-				throw new Error('Expected planningView in result');
+			if (!result || !('initialState' in result)) {
+				throw new Error('Expected initialState in result');
 			}
-			expect(result.planningView.teams).toHaveLength(1);
-			expect(result.planningView.teams[0].name).toBe('Test Team');
-			expect(result.planningView.teams[0].workPackages).toHaveLength(1);
-			expect(result.planningView.teams[0].workPackages[0].title).toBe('Test Work Package');
+			expect(result.initialState.teams).toHaveLength(1);
+			expect(result.initialState.teams[0].name).toBe('Test Team');
+			const assignedWorkPackages = result.initialState.workPackages.filter((w: WorkPackage) => w.assignedTeamId === team.id);
+			expect(assignedWorkPackages).toHaveLength(1);
+			expect(assignedWorkPackages[0].title).toBe('Test Work Package');
 		});
 
 		it('should load planning view with capacity overrides', async () => {
@@ -143,15 +164,83 @@ describe('Planning Page Routes', () => {
 
 			const result = await load({} as Parameters<typeof load>[0]);
 
-			if (!result || !('planningView' in result)) {
-				throw new Error('Expected planningView in result');
+			if (!result || !('initialState' in result)) {
+				throw new Error('Expected initialState in result');
 			}
-			expect(result.planningView.teams).toHaveLength(1);
-			expect(result.planningView.teams[0].capacityOverrides).toHaveLength(1);
-			expect(result.planningView.teams[0].capacityOverrides[0]).toEqual({
+			expect(result.initialState.teams).toHaveLength(1);
+			expect(result.initialState.teams[0].capacityOverrides).toHaveLength(1);
+			expect(result.initialState.teams[0].capacityOverrides[0]).toEqual({
 				yearMonth: '2025-12',
 				capacity: 4.5
 			});
+		});
+
+		it('should return data matching PlanningPageData structure with all required fields', async () => {
+			// Create test data
+			const team = await createTeam(
+				{
+					name: 'Test Team',
+					monthlyCapacity: 3.0
+				},
+				testDb
+			);
+
+			await setCapacityOverride(team.id, '2025-12', 4.5, testDb);
+
+			const wp = await createWorkPackage(
+				{
+					title: 'Test Work Package',
+					description: 'Test description',
+					sizeInPersonMonths: 2.0,
+					priority: 0
+				},
+				testDb
+			);
+
+			await assignWorkPackage(wp.id, team.id, 0, testDb);
+
+			const result = await load({} as Parameters<typeof load>[0]);
+
+			// Verify structure matches PlanningPageData
+			if (!result || !('initialState' in result)) {
+				throw new Error('Expected initialState in result');
+			}
+			expect(result).toHaveProperty('initialState');
+			
+			// Verify team structure
+			expect(result.initialState.teams).toHaveLength(1);
+			const teamData = result.initialState.teams[0];
+			expect(teamData).toHaveProperty('id');
+			expect(teamData).toHaveProperty('name');
+			expect(teamData).toHaveProperty('monthlyCapacityInPersonMonths');
+			expect(teamData).toHaveProperty('capacityOverrides');
+			expect(typeof teamData.id).toBe('string');
+			expect(typeof teamData.name).toBe('string');
+			expect(typeof teamData.monthlyCapacityInPersonMonths).toBe('number');
+			expect(Array.isArray(teamData.capacityOverrides)).toBe(true);
+			
+			// Verify capacity override structure
+			expect(teamData.capacityOverrides).toHaveLength(1);
+			const override = teamData.capacityOverrides[0];
+			expect(override).toHaveProperty('yearMonth');
+			expect(override).toHaveProperty('capacity');
+			expect(typeof override.yearMonth).toBe('string');
+			expect(typeof override.capacity).toBe('number');
+			
+			// Verify work package structure
+			expect(result.initialState.workPackages).toHaveLength(1);
+			const wpData = result.initialState.workPackages[0];
+			expect(wpData).toHaveProperty('id');
+			expect(wpData).toHaveProperty('title');
+			expect(wpData).toHaveProperty('description');
+			expect(wpData).toHaveProperty('sizeInPersonMonths');
+			expect(wpData).toHaveProperty('priority');
+			expect(wpData).toHaveProperty('assignedTeamId');
+			expect(typeof wpData.id).toBe('string');
+			expect(typeof wpData.title).toBe('string');
+			expect(typeof wpData.sizeInPersonMonths).toBe('number');
+			expect(typeof wpData.priority).toBe('number');
+			expect(wpData.assignedTeamId).toBe(team.id);
 		});
 	});
 
@@ -177,11 +266,11 @@ describe('Planning Page Routes', () => {
 
 			// Verify the capacity was actually updated
 			const view = await load({} as Parameters<typeof load>[0]);
-			if (!view || !('planningView' in view)) {
-				throw new Error('Expected planningView in result');
+			if (!view || !('initialState' in view)) {
+				throw new Error('Expected initialState in result');
 			}
-			expect(view.planningView.teams[0].capacityOverrides).toHaveLength(1);
-			expect(view.planningView.teams[0].capacityOverrides[0].capacity).toBe(4.5);
+			expect(view.initialState.teams[0].capacityOverrides).toHaveLength(1);
+			expect(view.initialState.teams[0].capacityOverrides[0].capacity).toBe(4.5);
 		});
 
 		it('should return error when teamId is missing', async () => {
@@ -254,11 +343,12 @@ describe('Planning Page Routes', () => {
 
 			// Verify the work package was assigned
 			const view = await load({} as Parameters<typeof load>[0]);
-			if (!view || !('planningView' in view)) {
-				throw new Error('Expected planningView in result');
+			if (!view || !('initialState' in view)) {
+				throw new Error('Expected initialState in result');
 			}
-			expect(view.planningView.teams[0].workPackages).toHaveLength(1);
-			expect(view.planningView.teams[0].workPackages[0].id).toBe(wp.id);
+			const assignedWorkPackages = view.initialState.workPackages.filter((w: WorkPackage) => w.assignedTeamId === team.id);
+			expect(assignedWorkPackages).toHaveLength(1);
+			expect(assignedWorkPackages[0].id).toBe(wp.id);
 		});
 
 		it('should unassign work package when teamId is empty', async () => {
@@ -293,11 +383,13 @@ describe('Planning Page Routes', () => {
 
 			// Verify the work package was unassigned
 			const view = await load({} as Parameters<typeof load>[0]);
-			if (!view || !('planningView' in view)) {
-				throw new Error('Expected planningView in result');
+			if (!view || !('initialState' in view)) {
+				throw new Error('Expected initialState in result');
 			}
-			expect(view.planningView.teams[0].workPackages).toHaveLength(0);
-			expect(view.planningView.unassignedWorkPackages).toHaveLength(1);
+			const assignedWorkPackages = view.initialState.workPackages.filter((w: WorkPackage) => w.assignedTeamId === team.id);
+			expect(assignedWorkPackages).toHaveLength(0);
+			const unassignedWorkPackages = view.initialState.workPackages.filter((w: WorkPackage) => !w.assignedTeamId);
+			expect(unassignedWorkPackages).toHaveLength(1);
 		});
 
 		it('should return error when workPackageId is missing', async () => {
@@ -313,9 +405,26 @@ describe('Planning Page Routes', () => {
 		});
 
 		it('should return error when position is invalid', async () => {
+			const team = await createTeam(
+				{
+					name: 'Test Team',
+					monthlyCapacity: 3.0
+				},
+				testDb
+			);
+
+			const wp = await createWorkPackage(
+				{
+					title: 'Test Work Package',
+					sizeInPersonMonths: 2.0,
+					priority: 1
+				},
+				testDb
+			);
+
 			const formData = new FormData();
-			formData.set('workPackageId', 'wp-123');
-			formData.set('teamId', 'team-123');
+			formData.set('workPackageId', wp.id);
+			formData.set('teamId', team.id);
 			formData.set('position', 'invalid');
 
 			const mockEvent = createMockRequest(formData);
@@ -323,6 +432,35 @@ describe('Planning Page Routes', () => {
 
 			expect(result).toHaveProperty('status', 400);
 			expectErrorMessage(result, 'Invalid position value');
+		});
+
+		it('should return error when team does not exist', async () => {
+			const wp = await createWorkPackage(
+				{
+					title: 'Test Work Package',
+					sizeInPersonMonths: 2.0,
+					priority: 1
+				},
+				testDb
+			);
+
+			const formData = new FormData();
+			formData.set('workPackageId', wp.id);
+			formData.set('teamId', 'nonexistent-team-id');
+			formData.set('position', '0');
+
+			const mockEvent = createMockRequest(formData);
+			const result = await actions.assignWorkPackage(mockEvent as Parameters<typeof actions.assignWorkPackage>[0]);
+
+			expect(result).toHaveProperty('status', 400);
+			expectErrorMessage(result, 'Invalid team assignment');
+			// Verify the error details include the team ID
+			if (result && typeof result === 'object' && 'data' in result) {
+				const data = (result as { data: unknown }).data;
+				if (data && typeof data === 'object' && 'details' in data) {
+					expect((data as { details: string }).details).toContain('nonexistent-team-id');
+				}
+			}
 		});
 	});
 
@@ -342,12 +480,13 @@ describe('Planning Page Routes', () => {
 
 			// Verify the work package was created
 			const view = await load({} as Parameters<typeof load>[0]);
-			if (!view || !('planningView' in view)) {
-				throw new Error('Expected planningView in result');
+			if (!view || !('initialState' in view)) {
+				throw new Error('Expected initialState in result');
 			}
-			expect(view.planningView.unassignedWorkPackages).toHaveLength(1);
-			expect(view.planningView.unassignedWorkPackages[0].title).toBe('New Work Package');
-			expect(view.planningView.unassignedWorkPackages[0].description).toBe('Test description');
+			const unassignedWorkPackages = view.initialState.workPackages.filter((w: WorkPackage) => !w.assignedTeamId);
+			expect(unassignedWorkPackages).toHaveLength(1);
+			expect(unassignedWorkPackages[0].title).toBe('New Work Package');
+			expect(unassignedWorkPackages[0].description).toBe('Test description');
 		});
 
 		it('should create work package without description', async () => {
@@ -362,10 +501,11 @@ describe('Planning Page Routes', () => {
 			expect(result).toHaveProperty('success', true);
 
 			const view = await load({} as Parameters<typeof load>[0]);
-			if (!view || !('planningView' in view)) {
-				throw new Error('Expected planningView in result');
+			if (!view || !('initialState' in view)) {
+				throw new Error('Expected initialState in result');
 			}
-			expect(view.planningView.unassignedWorkPackages[0].description).toBeNull();
+			const unassignedWorkPackages = view.initialState.workPackages.filter((w: WorkPackage) => !w.assignedTeamId);
+			expect(unassignedWorkPackages[0].description).toBeUndefined();
 		});
 
 		it('should return error when title is missing', async () => {
@@ -428,10 +568,10 @@ describe('Planning Page Routes', () => {
 
 			// Verify the work package was deleted
 			const view = await load({} as Parameters<typeof load>[0]);
-			if (!view || !('planningView' in view)) {
-				throw new Error('Expected planningView in result');
+			if (!view || !('initialState' in view)) {
+				throw new Error('Expected initialState in result');
 			}
-			expect(view.planningView.unassignedWorkPackages).toHaveLength(0);
+			expect(view.initialState.workPackages).toHaveLength(0);
 		});
 
 		it('should return error when id is missing', async () => {
@@ -459,12 +599,12 @@ describe('Planning Page Routes', () => {
 
 			// Verify the team was persisted to database
 			const view = await load({} as Parameters<typeof load>[0]);
-			if (!view || !('planningView' in view)) {
-				throw new Error('Expected planningView in result');
+			if (!view || !('initialState' in view)) {
+				throw new Error('Expected initialState in result');
 			}
-			expect(view.planningView.teams).toHaveLength(1);
-			expect(view.planningView.teams[0].name).toBe('Engineering Team');
-			expect(view.planningView.teams[0].monthlyCapacity).toBe(5.0);
+			expect(view.initialState.teams).toHaveLength(1);
+			expect(view.initialState.teams[0].name).toBe('Engineering Team');
+			expect(view.initialState.teams[0].monthlyCapacityInPersonMonths).toBe(5.0);
 		});
 
 		it('should return error when name is missing', async () => {
@@ -513,12 +653,12 @@ describe('Planning Page Routes', () => {
 
 			// Verify the changes were persisted to database
 			const view = await load({} as Parameters<typeof load>[0]);
-			if (!view || !('planningView' in view)) {
-				throw new Error('Expected planningView in result');
+			if (!view || !('initialState' in view)) {
+				throw new Error('Expected initialState in result');
 			}
-			expect(view.planningView.teams).toHaveLength(1);
-			expect(view.planningView.teams[0].name).toBe('Updated Team');
-			expect(view.planningView.teams[0].monthlyCapacity).toBe(4.5);
+			expect(view.initialState.teams).toHaveLength(1);
+			expect(view.initialState.teams[0].name).toBe('Updated Team');
+			expect(view.initialState.teams[0].monthlyCapacityInPersonMonths).toBe(4.5);
 		});
 
 		it('should update only name when monthlyCapacity is not provided', async () => {
@@ -540,11 +680,11 @@ describe('Planning Page Routes', () => {
 			expect(result).toEqual({ success: true });
 
 			const view = await load({} as Parameters<typeof load>[0]);
-			if (!view || !('planningView' in view)) {
-				throw new Error('Expected planningView in result');
+			if (!view || !('initialState' in view)) {
+				throw new Error('Expected initialState in result');
 			}
-			expect(view.planningView.teams[0].name).toBe('Updated Team');
-			expect(view.planningView.teams[0].monthlyCapacity).toBe(3.0);
+			expect(view.initialState.teams[0].name).toBe('Updated Team');
+			expect(view.initialState.teams[0].monthlyCapacityInPersonMonths).toBe(3.0);
 		});
 
 		it('should return error when id is missing', async () => {
@@ -590,14 +730,15 @@ describe('Planning Page Routes', () => {
 
 			// Verify the team was deleted
 			const view = await load({} as Parameters<typeof load>[0]);
-			if (!view || !('planningView' in view)) {
-				throw new Error('Expected planningView in result');
+			if (!view || !('initialState' in view)) {
+				throw new Error('Expected initialState in result');
 			}
-			expect(view.planningView.teams).toHaveLength(0);
+			expect(view.initialState.teams).toHaveLength(0);
 			
 			// Verify work package was unassigned
-			expect(view.planningView.unassignedWorkPackages).toHaveLength(1);
-			expect(view.planningView.unassignedWorkPackages[0].id).toBe(wp.id);
+			const unassignedWorkPackages = view.initialState.workPackages.filter((w: WorkPackage) => !w.assignedTeamId);
+			expect(unassignedWorkPackages).toHaveLength(1);
+			expect(unassignedWorkPackages[0].id).toBe(wp.id);
 		});
 
 		it('should delete team with capacity overrides', async () => {
@@ -621,10 +762,10 @@ describe('Planning Page Routes', () => {
 
 			// Verify the team and its capacity overrides were deleted
 			const view = await load({} as Parameters<typeof load>[0]);
-			if (!view || !('planningView' in view)) {
-				throw new Error('Expected planningView in result');
+			if (!view || !('initialState' in view)) {
+				throw new Error('Expected initialState in result');
 			}
-			expect(view.planningView.teams).toHaveLength(0);
+			expect(view.initialState.teams).toHaveLength(0);
 		});
 
 		it('should return error when id is missing', async () => {
@@ -660,11 +801,11 @@ describe('Planning Page Routes', () => {
 
 			// Verify zero capacity was persisted
 			const view = await load({} as Parameters<typeof load>[0]);
-			if (!view || !('planningView' in view)) {
-				throw new Error('Expected planningView in result');
+			if (!view || !('initialState' in view)) {
+				throw new Error('Expected initialState in result');
 			}
-			expect(view.planningView.teams[0].capacityOverrides).toHaveLength(1);
-			expect(view.planningView.teams[0].capacityOverrides[0].capacity).toBe(0);
+			expect(view.initialState.teams[0].capacityOverrides).toHaveLength(1);
+			expect(view.initialState.teams[0].capacityOverrides[0].capacity).toBe(0);
 		});
 
 		it('should reject negative capacity values', async () => {

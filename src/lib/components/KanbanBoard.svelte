@@ -149,6 +149,15 @@
 		});
 	}
 
+	/**
+	 * Handle drag-and-drop finalize event
+	 * 
+	 * Note: svelte-dnd-action fires finalize on BOTH the origin and target zones when an item
+	 * is dragged. When the last item is dragged out of a column, the origin zone receives a
+	 * finalize event with an empty items array. We must skip the server request in this case
+	 * because the server validation explicitly rejects empty update arrays (returns 400 error).
+	 * The target zone will handle the actual persistence with the correct data.
+	 */
 	function handleDndFinalize(columnId: string, e: CustomEvent) {
 		const items = e.detail.items as WorkPackage[];
 		const newTeamId = columnId === 'unassigned' ? undefined : columnId;
@@ -167,6 +176,13 @@
 			teamId: newTeamId ?? null,
 			position: index
 		}));
+
+		// Skip server request if there are no updates to send
+		// This prevents 400 errors when dragging the last item out of a column
+		// (origin zone fires finalize with empty items array)
+		if (updates.length === 0) {
+			return;
+		}
 
 		// Optimistically update the store
 		appState.update((state) => {

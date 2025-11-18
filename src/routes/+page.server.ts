@@ -40,8 +40,48 @@ function formatErrorMessage(error: unknown): string {
 export const load: PageServerLoad = async () => {
 	try {
 		const planningView = getPlanningView();
+		
+		// Transform PlanningView into AppState format (flat arrays)
+		// Flatten work packages from all teams and unassigned into a single array
+		const allWorkPackages = [
+			...planningView.unassignedWorkPackages.map(wp => ({
+				id: wp.id,
+				title: wp.title,
+				description: wp.description || undefined,
+				sizeInPersonMonths: wp.sizeInPersonMonths,
+				priority: wp.priority,
+				assignedTeamId: undefined,
+				scheduledPosition: wp.scheduledPosition || undefined
+			})),
+			...planningView.teams.flatMap(team => 
+				team.workPackages.map(wp => ({
+					id: wp.id,
+					title: wp.title,
+					description: wp.description || undefined,
+					sizeInPersonMonths: wp.sizeInPersonMonths,
+					priority: wp.priority,
+					assignedTeamId: team.id,
+					scheduledPosition: wp.scheduledPosition || undefined
+				}))
+			)
+		];
+
+		// Transform teams into AppState format
+		const allTeams = planningView.teams.map(team => ({
+			id: team.id,
+			name: team.name,
+			monthlyCapacityInPersonMonths: team.monthlyCapacity,
+			capacityOverrides: team.capacityOverrides.map(override => ({
+				yearMonth: override.yearMonth,
+				capacity: override.capacity
+			}))
+		}));
+
 		return {
-			planningView
+			initialState: {
+				teams: allTeams,
+				workPackages: allWorkPackages
+			}
 		};
 	} catch (error) {
 		console.error('Failed to load planning view:', error);
@@ -101,6 +141,17 @@ export const actions: Actions = {
 			if (!teamId) {
 				await unassignWorkPackage(workPackageId);
 				return { success: true };
+			}
+
+			// Validate that the team exists before assignment
+			const planningView = getPlanningView();
+			const teamExists = planningView.teams.some(team => team.id === teamId);
+			
+			if (!teamExists) {
+				return fail(400, {
+					error: 'Invalid team assignment',
+					details: `Team with ID ${teamId} does not exist`
+				});
 			}
 
 			const position = positionStr ? parseInt(positionStr, 10) : 0;

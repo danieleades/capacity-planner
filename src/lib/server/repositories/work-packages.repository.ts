@@ -136,7 +136,7 @@ export async function reorderWorkPackages(
 	updates: Array<{ id: string; teamId: string | null; position: number }>,
 	db: DbParam = defaultDb
 ): Promise<void> {
-	return dbOperation(async () => {
+	return dbOperation(() => {
 		// Use transaction for atomicity - all updates succeed or all fail
 		// Note: better-sqlite3 transactions must be synchronous (no async/await)
 		db.transaction((tx) => {

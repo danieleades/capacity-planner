@@ -16,8 +16,13 @@
 	let errorMessage = $state<string>('');
 	let lastFailedAction = $state<(() => void) | null>(null);
 
+	// Initialize appState store immediately with server data before first render
+	// This ensures SSR hydration works correctly without content flash
+	appState.set(data.initialState);
+
 	// Wrap page data with optimistikit() to enable optimistic updates
-	const { data: optimisticData, enhance: optimisticEnhance } = optimistikit(
+	// We only need the enhance function, not the optimistic data
+	const { enhance: optimisticEnhance } = optimistikit(
 		() => data,
 		{
 			key: 'planning-data',
@@ -25,24 +30,12 @@
 		}
 	);
 
-	// Track whether store has been initialized to prevent overwriting
-	let storeInitialized = $state(false);
-
 	// Watch for form action results to handle errors
 	$effect(() => {
 		if ($page.form && 'error' in $page.form) {
 			const error = $page.form.error as string;
 			const details = 'details' in $page.form ? ($page.form.details as string) : '';
 			errorMessage = details || error;
-		}
-	});
-
-	// Initialize appState from server data only once in browser context
-	$effect(() => {
-		// Only run in browser and only initialize once
-		if (typeof window !== 'undefined' && !storeInitialized && optimisticData.initialState) {
-			appState.set(optimisticData.initialState);
-			storeInitialized = true;
 		}
 	});
 

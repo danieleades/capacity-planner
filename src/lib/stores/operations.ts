@@ -15,6 +15,7 @@ export function addTeam(state: AppState, name: string, capacity: number): AppSta
 				id: crypto.randomUUID(),
 				name,
 				monthlyCapacityInPersonMonths: capacity,
+				capacityOverrides: [],
 			},
 		],
 	};
@@ -55,7 +56,7 @@ export function setMonthlyCapacity(
 		teams: state.teams.map((team) => {
 			if (team.id !== teamId) return team;
 
-			const overrides = team.capacityOverrides || [];
+			const overrides = team.capacityOverrides;
 			const existingIndex = overrides.findIndex((co) => co.yearMonth === yearMonth);
 
 			let newOverrides: MonthlyCapacity[];
@@ -84,10 +85,10 @@ export function clearMonthlyCapacity(
 		teams: state.teams.map((team) => {
 			if (team.id !== teamId) return team;
 
-			const overrides = team.capacityOverrides || [];
+			const overrides = team.capacityOverrides;
 			const newOverrides = overrides.filter((co) => co.yearMonth !== yearMonth);
 
-			return { ...team, capacityOverrides: newOverrides.length > 0 ? newOverrides : undefined };
+			return { ...team, capacityOverrides: newOverrides };
 		}),
 	};
 }
@@ -100,8 +101,13 @@ export function addWorkPackage(
 	size: number,
 	description?: string
 ): AppState {
-	// Start priority at 0 for the first work package
-	const maxPriority = Math.max(-1, ...state.workPackages.map((wp) => wp.priority));
+	// Priority starts at 0 for first work package, then increments from max existing priority
+	// When empty: maxPriority = -1, so first work package gets priority 0
+	// When not empty: maxPriority = highest existing priority, new work package gets priority + 1
+	const maxPriority = state.workPackages.length === 0
+		? -1
+		: Math.max(...state.workPackages.map((wp) => wp.priority));
+	
 	return {
 		...state,
 		workPackages: [

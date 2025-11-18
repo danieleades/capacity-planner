@@ -32,6 +32,61 @@ describe('KanbanBoard', () => {
 			expect(screen.getByText('Unassigned')).toBeInTheDocument();
 		});
 
+		it('should not send server request when finalize event has empty items array', async () => {
+			// Setup: Create a component with work packages
+			appState.set({
+				teams: [
+					{
+						id: 'team-1',
+						name: 'Engineering Team',
+						monthlyCapacityInPersonMonths: 5.0,
+						capacityOverrides: []
+					}
+				],
+				workPackages: [
+					{
+						id: 'wp-1',
+						title: 'Test Work Package',
+						description: undefined,
+						sizeInPersonMonths: 2.0,
+						priority: 0,
+						assignedTeamId: 'team-1',
+						scheduledPosition: 0
+					}
+				]
+			});
+
+			const { container } = render(KanbanBoard, { props: { optimisticEnhance: mockOptimisticEnhance } });
+
+			// Simulate svelte-dnd-action finalize event with empty items array
+			// This happens when the last item is dragged out of a column (origin zone event)
+			const teamColumn = container.querySelector('[data-id="team-1"]') || 
+			                   container.querySelectorAll('.min-h-96')[1]; // Second column (first team)
+			
+			if (teamColumn) {
+				const finalizeEvent = new CustomEvent('finalize', {
+					detail: {
+						items: [], // Empty array - simulates dragging last item out
+						info: { source: 'pointer' }
+					}
+				});
+				
+				// Clear any previous fetch calls
+				vi.clearAllMocks();
+				
+				// Dispatch the event
+				teamColumn.dispatchEvent(finalizeEvent);
+				
+				// Wait for any async operations
+				await new Promise(resolve => setTimeout(resolve, 0));
+				
+				// Verify: No fetch call should be made when items array is empty
+				// This prevents the server from receiving an invalid empty updates array
+				// which would return a 400 error ("Updates must be a non-empty array")
+				expect(global.fetch).not.toHaveBeenCalled();
+			}
+		});
+
 		it('should render team columns', () => {
 			appState.set({
 				teams: [

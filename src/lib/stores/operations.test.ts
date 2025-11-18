@@ -145,7 +145,7 @@ describe('store operations', () => {
 			const team2 = createMockTeam();
 			const state = { ...initialState, teams: [team1, team2] };
 			const result = setMonthlyCapacity(state, team1.id, '2025-01', 3.0);
-			expect(result.teams[1].capacityOverrides).toBeUndefined();
+			expect(result.teams[1].capacityOverrides).toEqual([]);
 		});
 	});
 
@@ -156,7 +156,7 @@ describe('store operations', () => {
 			});
 			const state = { ...initialState, teams: [team] };
 			const result = clearMonthlyCapacity(state, team.id, '2025-01');
-			expect(result.teams[0].capacityOverrides).toBeUndefined();
+			expect(result.teams[0].capacityOverrides).toEqual([]);
 		});
 
 		it('should keep other overrides', () => {
@@ -176,7 +176,7 @@ describe('store operations', () => {
 			const team = createMockTeam();
 			const state = { ...initialState, teams: [team] };
 			const result = clearMonthlyCapacity(state, team.id, '2025-01');
-			expect(result.teams[0].capacityOverrides).toBeUndefined();
+			expect(result.teams[0].capacityOverrides).toEqual([]);
 		});
 	});
 
