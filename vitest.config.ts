@@ -25,7 +25,7 @@ export default defineConfig({
 	resolve: {
 		alias: {
 			$lib: resolve(__dirname, './src/lib'),
-			$app: resolve(__dirname, './node_modules/@sveltejs/kit/src/runtime/app'),
+			$app: resolve(__dirname, './src/test/mocks/app'),
 		},
 	},
 });
