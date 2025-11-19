@@ -156,6 +156,20 @@ describe('WorkPackageModal', () => {
 			const hiddenIdInput = container.querySelector('input[type="hidden"][name="id"]');
 			expect(hiddenIdInput).not.toBeInTheDocument();
 		});
+
+		it('should include hidden clientId field when creating', () => {
+			const { container } = render(WorkPackageModal, {
+				props: {
+					optimisticEnhance: mockOptimisticEnhance,
+					open: true,
+					onClose: mockOnClose
+				}
+			});
+
+			const clientIdInput = container.querySelector('input[type="hidden"][name="clientId"]') as HTMLInputElement | null;
+			expect(clientIdInput).toBeInTheDocument();
+			expect(clientIdInput?.value).toBeTruthy();
+		});
 	});
 
 	describe('form pre-population', () => {

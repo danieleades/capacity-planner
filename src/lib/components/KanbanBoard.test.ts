@@ -174,6 +174,39 @@ describe('KanbanBoard', () => {
 			
 			expect(screen.getByText('Assigned Work')).toBeInTheDocument();
 		});
+
+		it('should label pending work packages as syncing', () => {
+			initialState = {
+				teams: [],
+				workPackages: [
+					{
+						id: 'temp-wp',
+						clientId: 'temp-wp',
+						title: 'Unsynced Work',
+						description: undefined,
+						sizeInPersonMonths: 1.5,
+						priority: 0,
+						assignedTeamId: undefined,
+						scheduledPosition: undefined
+					}
+				]
+			};
+
+			const appState = createAppStore(initialState);
+			const { teams, workPackages, unassignedWorkPackages } = createDerivedStores(appState);
+			render(KanbanBoard, {
+				props: { optimisticEnhance: mockOptimisticEnhance },
+				context: new Map<string, unknown>([
+					['appState', appState],
+					['teams', teams],
+					['workPackages', workPackages],
+					['unassignedWorkPackages', unassignedWorkPackages]
+				])
+			});
+
+			expect(screen.getByText('Syncing…')).toBeInTheDocument();
+			expect(screen.getByText('Unsynced Work')).toBeInTheDocument();
+		});
 	});
 
 	describe('error handling', () => {

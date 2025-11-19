@@ -146,5 +146,65 @@ describe('TeamManager', () => {
 			expect(form).toBeInTheDocument();
 			expect(form).toHaveAttribute('method', 'POST');
 		});
+
+		it('should disable edit and delete controls while a team is pending', () => {
+			appState.set({
+				teams: [
+					{
+						id: 'temp-team',
+						clientId: 'temp-team',
+						name: 'Pending Team',
+						monthlyCapacityInPersonMonths: 4.0,
+						capacityOverrides: []
+					}
+				],
+				workPackages: []
+			});
+
+			render(TeamManager, {
+				props: { optimisticEnhance: mockOptimisticEnhance },
+				context: new Map<string, unknown>([['teams', teams]])
+			});
+
+			expect(screen.getByText('Syncing…')).toBeInTheDocument();
+			expect(screen.getByLabelText('Edit team')).toBeDisabled();
+			expect(screen.getByLabelText('Delete team')).toBeDisabled();
+		});
+
+		it('should disable capacity overrides for pending teams', () => {
+			appState.set({
+				teams: [
+					{
+						id: 'temp-team',
+						clientId: 'temp-team',
+						name: 'Pending Team',
+						monthlyCapacityInPersonMonths: 4.0,
+						capacityOverrides: []
+					}
+				],
+				workPackages: []
+			});
+
+			const { container } = render(TeamManager, {
+				props: { optimisticEnhance: mockOptimisticEnhance },
+				context: new Map<string, unknown>([['teams', teams]])
+			});
+
+			const capacityInput = container.querySelector('input[name="capacity"]') as HTMLInputElement;
+			expect(capacityInput).toBeDisabled();
+		});
+
+		it('should include hidden clientId input when creating new teams', async () => {
+			const { container } = render(TeamManager, {
+				props: { optimisticEnhance: mockOptimisticEnhance },
+				context: new Map<string, unknown>([['teams', teams]])
+			});
+
+			await fireEvent.click(screen.getByText('+ Add Team'));
+
+			const clientIdInput = container.querySelector('input[type="hidden"][name="clientId"]') as HTMLInputElement | null;
+			expect(clientIdInput).toBeInTheDocument();
+			expect(clientIdInput?.value).toBeTruthy();
+		});
 	});
 });

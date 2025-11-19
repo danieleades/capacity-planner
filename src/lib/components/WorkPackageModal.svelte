@@ -18,6 +18,7 @@
 	let formSize = $state(0);
 	let formDescription = $state('');
 	let workPackageFormRef = $state<HTMLFormElement | null>(null);
+	let createClientId = $state<string>(crypto.randomUUID());
 
 	// Update form when editingWorkPackage changes
 	$effect(() => {
@@ -29,6 +30,7 @@
 			formTitle = '';
 			formSize = 0;
 			formDescription = '';
+			createClientId = crypto.randomUUID();
 		}
 	});
 
@@ -55,6 +57,7 @@
 		bind:this={workPackageFormRef}
 		method="POST"
 		action={editingWorkPackage ? '?/updateWorkPackage' : '?/createWorkPackage'}
+		data-client-action={editingWorkPackage ? undefined : 'create-work-package'}
 		use:optimisticEnhance={(data, input) => {
 			// Optimistically update the data
 			const title = input.formData.get('title') as string;
@@ -77,13 +80,15 @@
 					}
 				} else {
 					// Add new work package - compute priority from max existing priority
+					const clientId = (input.formData.get('clientId') as string) || crypto.randomUUID();
 					const maxPriority = data.initialState.workPackages.reduce(
 						(max: number, wp: WorkPackage) => Math.max(max, wp.priority),
 						-1
 					);
 					
 					const newWorkPackage: WorkPackage = {
-						id: crypto.randomUUID(),
+						id: clientId,
+						clientId,
 						title,
 						sizeInPersonMonths,
 						description: description || undefined,
@@ -102,6 +107,8 @@
 	>
 		{#if editingWorkPackage}
 			<input type="hidden" name="id" value={editingWorkPackage.id} />
+		{:else}
+			<input type="hidden" name="clientId" value={createClientId} />
 		{/if}
 		
 		<WorkPackageForm

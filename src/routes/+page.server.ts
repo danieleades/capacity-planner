@@ -232,8 +232,11 @@ export const actions: Actions = {
 	},
 
 	createWorkPackage: async ({ request }) => {
+		let clientId: string | null = null;
 		try {
 			const data = await request.formData();
+			const clientIdValue = data.get('clientId');
+			clientId = typeof clientIdValue === 'string' ? clientIdValue : null;
 			const title = data.get('title') as string;
 			const description = data.get('description') as string | null;
 			const sizeStr = data.get('sizeInPersonMonths') as string;
@@ -241,14 +244,16 @@ export const actions: Actions = {
 			if (!title || !sizeStr) {
 				return fail(400, {
 					error: 'Missing required fields',
-					details: 'Title and size are required'
+					details: 'Title and size are required',
+					clientId
 				});
 			}
 
 			if (title.trim().length === 0) {
 				return fail(400, {
 					error: 'Invalid title',
-					details: 'Title cannot be empty'
+					details: 'Title cannot be empty',
+					clientId
 				});
 			}
 
@@ -256,7 +261,8 @@ export const actions: Actions = {
 			if (isNaN(sizeInPersonMonths) || sizeInPersonMonths <= 0) {
 				return fail(400, {
 					error: 'Invalid size',
-					details: 'Size must be a positive number'
+					details: 'Size must be a positive number',
+					clientId
 				});
 			}
 
@@ -266,12 +272,13 @@ export const actions: Actions = {
 				sizeInPersonMonths
 			});
 
-			return { success: true, id: result.id };
+			return { success: true, id: result.id, clientId };
 		} catch (error) {
 			console.error('Failed to create work package:', error);
 			return fail(500, {
 				error: 'Failed to create work package',
-				details: formatErrorMessage(error)
+				details: formatErrorMessage(error),
+				clientId
 			});
 		}
 	},
@@ -300,22 +307,27 @@ export const actions: Actions = {
 	},
 
 	createTeam: async ({ request }) => {
+		let clientId: string | null = null;
 		try {
 			const data = await request.formData();
+			const clientIdValue = data.get('clientId');
+			clientId = typeof clientIdValue === 'string' ? clientIdValue : null;
 			const name = data.get('name') as string;
 			const monthlyCapacityStr = data.get('monthlyCapacity') as string;
 
 			if (!name || !monthlyCapacityStr) {
 				return fail(400, {
 					error: 'Missing required fields',
-					details: 'Name and monthly capacity are required'
+					details: 'Name and monthly capacity are required',
+					clientId
 				});
 			}
 
 			if (name.trim().length === 0) {
 				return fail(400, {
 					error: 'Invalid name',
-					details: 'Name cannot be empty'
+					details: 'Name cannot be empty',
+					clientId
 				});
 			}
 
@@ -323,7 +335,8 @@ export const actions: Actions = {
 			if (isNaN(monthlyCapacity) || monthlyCapacity <= 0) {
 				return fail(400, {
 					error: 'Invalid monthly capacity',
-					details: 'Monthly capacity must be a positive number'
+					details: 'Monthly capacity must be a positive number',
+					clientId
 				});
 			}
 
@@ -332,12 +345,13 @@ export const actions: Actions = {
 				monthlyCapacity
 			});
 
-			return { success: true, id: result.id };
+			return { success: true, id: result.id, clientId };
 		} catch (error) {
 			console.error('Failed to create team:', error);
 			return fail(500, {
 				error: 'Failed to create team',
-				details: formatErrorMessage(error)
+				details: formatErrorMessage(error),
+				clientId
 			});
 		}
 	},

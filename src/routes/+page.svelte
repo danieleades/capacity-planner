@@ -4,6 +4,7 @@
 	import { optimistikit } from 'optimistikit';
 	import { enhance as svelteKitEnhance } from '$app/forms';
 	import type { PageData } from './$types';
+import type { ActionResult } from '@sveltejs/kit';
 	import TeamManager from '$lib/components/TeamManager.svelte';
 	import KanbanBoard from '$lib/components/KanbanBoard.svelte';
 	import WorkPackagesTable from '$lib/components/WorkPackagesTable.svelte';
@@ -29,11 +30,118 @@
 
 	// Wrap page data with optimistikit() to enable optimistic updates
 	// We only need the enhance function, not the optimistic data
+	type CreateClientAction = 'create-team' | 'create-work-package';
+	type SubmitHandlerArgs = {
+		formData: FormData;
+		formElement: HTMLFormElement;
+		action: URL;
+		result: ActionResult;
+		update: (options?: { reset?: boolean; invalidateAll?: boolean }) => Promise<void>;
+	};
+	type GenericSubmitHandler = (opts: SubmitHandlerArgs) => Promise<void> | void;
+
+	const enhanceWithResultHandling: typeof svelteKitEnhance = (form, callback) =>
+		svelteKitEnhance(form, (props) => {
+			const maybeHandler = callback?.(props) as
+				| void
+				| GenericSubmitHandler
+				| Promise<void | GenericSubmitHandler>;
+			if (!maybeHandler) {
+				return maybeHandler;
+			}
+
+			return async (event) => {
+				const handler = (await maybeHandler) as GenericSubmitHandler | void;
+				if (!handler) {
+					return;
+				}
+
+				try {
+					await handler(event as SubmitHandlerArgs);
+				} finally {
+					processActionResult(event);
+				}
+			};
+		});
+
+	function processActionResult({
+		formElement,
+		formData,
+		result
+	}: {
+		formElement: HTMLFormElement;
+		formData: FormData;
+		result: ActionResult;
+	}) {
+		const actionType = formElement.dataset.clientAction as CreateClientAction | undefined;
+		if (!actionType) {
+			return;
+		}
+
+		const clientId = extractClientId(result) ?? getClientIdFromForm(formData);
+		if (!clientId) {
+			return;
+		}
+
+		if (result.type === 'success') {
+			const serverId = extractServerId(result);
+			if (!serverId) {
+				return;
+			}
+
+			if (actionType === 'create-team') {
+				appState.reconcileTeamId(clientId, serverId);
+			} else {
+				appState.reconcileWorkPackageId(clientId, serverId);
+			}
+			return;
+		}
+
+		if (result.type === 'failure' || result.type === 'error') {
+			if (actionType === 'create-team') {
+				appState.removeTeamByClientId(clientId);
+			} else {
+				appState.removeWorkPackageByClientId(clientId);
+			}
+
+			if (result.type === 'error') {
+				const message =
+					result.error instanceof Error
+						? result.error.message
+						: typeof result.error === 'string'
+							? result.error
+							: 'Failed to submit form';
+				handleFormError(message);
+			}
+		}
+	}
+
+	function extractClientId(result: ActionResult): string | null {
+		if ('data' in result && result.data && typeof result.data === 'object') {
+			const value = (result.data as Record<string, unknown>).clientId;
+			return typeof value === 'string' ? value : null;
+		}
+		return null;
+	}
+
+	function extractServerId(result: ActionResult): string | null {
+		if (result.type !== 'success' || !result.data) {
+			return null;
+		}
+		const value = (result.data as Record<string, unknown>).id;
+		return typeof value === 'string' ? value : null;
+	}
+
+	function getClientIdFromForm(formData: FormData): string | null {
+		const value = formData.get('clientId');
+		return typeof value === 'string' ? value : null;
+	}
+
 	const { enhance: optimisticEnhance } = optimistikit(
 		() => data,
 		{
 			key: 'planning-data',
-			enhance: svelteKitEnhance
+			enhance: enhanceWithResultHandling
 		}
 	);
 

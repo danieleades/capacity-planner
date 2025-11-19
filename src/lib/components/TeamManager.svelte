@@ -24,6 +24,7 @@
 	let nameError = $state<string | null>(null);
 	let capacityError = $state<string | null>(null);
 	let teamFormRef = $state<HTMLFormElement | null>(null);
+	let createClientId = $state<string>(crypto.randomUUID());
 
 	function openAddModal() {
 		formName = '';
@@ -31,19 +32,22 @@
 		editingTeam = null;
 		nameError = null;
 		capacityError = null;
+		createClientId = crypto.randomUUID();
 		showAddModal = true;
 	}
 
 	function openEditModal(teamId: string) {
 		const team = $teams.find((t) => t.id === teamId);
-		if (team) {
-			formName = team.name;
-			formCapacity = team.monthlyCapacityInPersonMonths;
-			editingTeam = teamId;
-			nameError = null;
-			capacityError = null;
-			showAddModal = true;
+		if (!team || team.clientId) {
+			return;
 		}
+
+		formName = team.name;
+		formCapacity = team.monthlyCapacityInPersonMonths;
+		editingTeam = teamId;
+		nameError = null;
+		capacityError = null;
+		showAddModal = true;
 	}
 
 	function closeModal() {
@@ -53,6 +57,7 @@
 		formCapacity = 0;
 		nameError = null;
 		capacityError = null;
+		createClientId = crypto.randomUUID();
 	}
 
 	function validateForm(): boolean {
@@ -80,9 +85,13 @@
 		return isValid;
 	}
 
-	function handleDelete(teamId: string) {
+	function handleDelete(team: Team) {
+		if (team.clientId) {
+			return;
+		}
+
 		if (confirm('Are you sure you want to delete this team? Work packages will be unassigned.')) {
-			const form = document.getElementById(`delete-form-${teamId}`) as HTMLFormElement;
+			const form = document.getElementById(`delete-form-${team.id}`) as HTMLFormElement;
 			if (form) {
 				form.requestSubmit();
 			}
@@ -106,6 +115,7 @@
 	{:else}
 		<div class="space-y-4">
 			{#each $teams as team (team.id)}
+				{@const isPending = Boolean(team.clientId)}
 				<div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
 					<!-- Hidden delete form -->
 					<form
@@ -135,6 +145,9 @@
 					<div class="mb-4 flex items-center justify-between">
 						<div class="flex items-center gap-4">
 							<h3 class="text-xl font-semibold">{team.name}</h3>
+							{#if isPending}
+								<span class="text-xs font-semibold text-amber-600">Syncing…</span>
+							{/if}
 							<div class="flex items-center gap-2 text-sm text-gray-600">
 								<span>Default: {team.monthlyCapacityInPersonMonths} PM/month</span>
 								<CapacitySparkline {team} />
@@ -143,8 +156,10 @@
 						<div class="flex gap-2">
 							<button
 								onclick={() => openEditModal(team.id)}
-								class="text-blue-600 hover:text-blue-800"
+								class="text-blue-600 hover:text-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
+								disabled={isPending}
 								aria-label="Edit team"
+								title={isPending ? 'Team is syncing with the server' : 'Edit team'}
 							>
 								<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 									<path
@@ -156,9 +171,11 @@
 								</svg>
 							</button>
 							<button
-								onclick={() => handleDelete(team.id)}
-								class="text-red-600 hover:text-red-800"
+								onclick={() => handleDelete(team)}
+								class="text-red-600 hover:text-red-800 disabled:cursor-not-allowed disabled:opacity-50"
+								disabled={isPending}
 								aria-label="Delete team"
+								title={isPending ? 'Team is syncing with the server' : 'Delete team'}
 							>
 								<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 									<path
@@ -230,11 +247,15 @@
 											step="0.1"
 											min="0"
 											value={capacity}
+											disabled={isPending}
 											onchange={(e) => {
 												// Submit the form (optimistic update will happen automatically)
 												e.currentTarget.form?.requestSubmit();
 											}}
-											class="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+											class="w-full rounded border px-2 py-1 text-sm focus:outline-none focus:ring-1 {isPending
+												? 'cursor-not-allowed border-gray-200 bg-gray-50 text-gray-400'
+												: 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'}"
+											title={isPending ? 'Team is syncing with the server' : undefined}
 										/>
 									</form>
 								</div>
@@ -252,6 +273,7 @@
 		bind:this={teamFormRef}
 		method="POST"
 		action={editingTeam ? '?/updateTeam' : '?/createTeam'}
+		data-client-action={editingTeam ? undefined : 'create-team'}
 		use:optimisticEnhance={(data, input) => {
 			// Optimistically update the data
 			const name = input.formData.get('name') as string;
@@ -270,8 +292,10 @@
 					}
 				} else {
 					// Add new team
+					const clientId = (input.formData.get('clientId') as string) || crypto.randomUUID();
 					const newTeam: Team = {
-						id: crypto.randomUUID(),
+						id: clientId,
+						clientId,
 						name,
 						monthlyCapacityInPersonMonths: monthlyCapacity,
 						capacityOverrides: []
@@ -291,6 +315,8 @@
 	>
 		{#if editingTeam}
 			<input type="hidden" name="id" value={editingTeam} />
+		{:else}
+			<input type="hidden" name="clientId" value={createClientId} />
 		{/if}
 		
 		<div class="mb-4">

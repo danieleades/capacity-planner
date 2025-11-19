@@ -465,12 +465,15 @@ describe('Planning Page Routes', () => {
 			formData.set('description', 'Test description');
 			formData.set('sizeInPersonMonths', '2.5');
 			formData.set('priority', '1');
+			const clientId = 'wp-client-123';
+			formData.set('clientId', clientId);
 
 			const mockEvent = createMockRequest(formData);
 			const result = await actions.createWorkPackage(mockEvent as Parameters<typeof actions.createWorkPackage>[0]);
 
 			expect(result).toHaveProperty('success', true);
 			expect(result).toHaveProperty('id');
+			expect(result).toHaveProperty('clientId', clientId);
 
 			// Verify the work package was created
 			const view = await load({} as Parameters<typeof load>[0]);
@@ -488,6 +491,7 @@ describe('Planning Page Routes', () => {
 			formData.set('title', 'New Work Package');
 			formData.set('sizeInPersonMonths', '2.5');
 			formData.set('priority', '1');
+			formData.set('clientId', 'wp-client-234');
 
 			const mockEvent = createMockRequest(formData);
 			const result = await actions.createWorkPackage(mockEvent as Parameters<typeof actions.createWorkPackage>[0]);
@@ -506,24 +510,34 @@ describe('Planning Page Routes', () => {
 			const formData = new FormData();
 			formData.set('sizeInPersonMonths', '2.5');
 			formData.set('priority', '1');
+			const clientId = 'wp-client-missing-title';
+			formData.set('clientId', clientId);
 
 			const mockEvent = createMockRequest(formData);
 			const result = await actions.createWorkPackage(mockEvent as Parameters<typeof actions.createWorkPackage>[0]);
 
 			expect(result).toHaveProperty('status', 400);
 			expectErrorMessage(result, 'Missing required fields');
+			if (result && typeof result === 'object' && 'data' in result) {
+				expect((result as { data: { clientId?: string } }).data.clientId).toBe(clientId);
+			}
 		});
 
 		it('should return error when sizeInPersonMonths is invalid', async () => {
 			const formData = new FormData();
 			formData.set('title', 'New Work Package');
 			formData.set('sizeInPersonMonths', 'invalid');
+			const clientId = 'wp-client-invalid-size';
+			formData.set('clientId', clientId);
 
 			const mockEvent = createMockRequest(formData);
 			const result = await actions.createWorkPackage(mockEvent as Parameters<typeof actions.createWorkPackage>[0]);
 
 			expect(result).toHaveProperty('status', 400);
 			expectErrorMessage(result, 'Invalid size');
+			if (result && typeof result === 'object' && 'data' in result) {
+				expect((result as { data: { clientId?: string } }).data.clientId).toBe(clientId);
+			}
 		});
 	});
 
@@ -569,12 +583,15 @@ describe('Planning Page Routes', () => {
 			const formData = new FormData();
 			formData.set('name', 'Engineering Team');
 			formData.set('monthlyCapacity', '5.0');
+			const clientId = 'team-client-123';
+			formData.set('clientId', clientId);
 
 			const mockEvent = createMockRequest(formData);
 			const result = await actions.createTeam(mockEvent as Parameters<typeof actions.createTeam>[0]);
 
 			expect(result).toHaveProperty('success', true);
 			expect(result).toHaveProperty('id');
+			expect(result).toHaveProperty('clientId', clientId);
 
 			// Verify the team was persisted to database
 			const view = await load({} as Parameters<typeof load>[0]);
@@ -589,24 +606,34 @@ describe('Planning Page Routes', () => {
 		it('should return error when name is missing', async () => {
 			const formData = new FormData();
 			formData.set('monthlyCapacity', '5.0');
+			const clientId = 'team-client-missing-name';
+			formData.set('clientId', clientId);
 
 			const mockEvent = createMockRequest(formData);
 			const result = await actions.createTeam(mockEvent as Parameters<typeof actions.createTeam>[0]);
 
 			expect(result).toHaveProperty('status', 400);
 			expectErrorMessage(result, 'Missing required fields');
+			if (result && typeof result === 'object' && 'data' in result) {
+				expect((result as { data: { clientId?: string } }).data.clientId).toBe(clientId);
+			}
 		});
 
 		it('should return error when monthlyCapacity is invalid', async () => {
 			const formData = new FormData();
 			formData.set('name', 'Engineering Team');
 			formData.set('monthlyCapacity', 'invalid');
+			const clientId = 'team-client-invalid-capacity';
+			formData.set('clientId', clientId);
 
 			const mockEvent = createMockRequest(formData);
 			const result = await actions.createTeam(mockEvent as Parameters<typeof actions.createTeam>[0]);
 
 			expect(result).toHaveProperty('status', 400);
 			expectErrorMessage(result, 'Invalid monthly capacity');
+			if (result && typeof result === 'object' && 'data' in result) {
+				expect((result as { data: { clientId?: string } }).data.clientId).toBe(clientId);
+			}
 		});
 	});
 

@@ -6,22 +6,30 @@ export const MonthlyCapacitySchema = z.object({
 	capacity: z.number().nonnegative('Capacity must be non-negative')
 });
 
-export const TeamSchema = z.object({
-	id: z.string().min(1, 'Team ID is required'),
-	name: z.string().min(1, 'Team name is required'),
-	monthlyCapacityInPersonMonths: z.number().nonnegative('Capacity must be non-negative'),
-	capacityOverrides: z.array(MonthlyCapacitySchema).default([])
-});
+export const TeamSchema = z
+	.object({
+		id: z.string().min(1, 'Team ID is required'),
+		name: z.string().min(1, 'Team name is required'),
+		monthlyCapacityInPersonMonths: z.number().nonnegative('Capacity must be non-negative'),
+		capacityOverrides: z.array(MonthlyCapacitySchema).default([])
+	})
+	.extend({
+		clientId: z.uuid().optional()
+	});
 
-export const WorkPackageSchema = z.object({
-	id: z.string().min(1, 'Work package ID is required'),
-	title: z.string().min(1, 'Title is required'),
-	description: z.string().optional(),
-	sizeInPersonMonths: z.number().positive('Size must be positive'),
-	priority: z.number().int().nonnegative('Priority must be a non-negative integer'),
-	assignedTeamId: z.string().optional(),
-	scheduledPosition: z.number().int().nonnegative().optional()
-});
+export const WorkPackageSchema = z
+	.object({
+		id: z.string().min(1, 'Work package ID is required'),
+		title: z.string().min(1, 'Title is required'),
+		description: z.string().optional(),
+		sizeInPersonMonths: z.number().positive('Size must be positive'),
+		priority: z.number().int().nonnegative('Priority must be a non-negative integer'),
+		assignedTeamId: z.string().optional(),
+		scheduledPosition: z.number().int().nonnegative().optional()
+	})
+	.extend({
+		clientId: z.uuid().optional()
+	});
 
 export const AppStateSchema = z
 	.object({
