@@ -26,9 +26,9 @@
 		showAddModal = true;
 	}
 
-	function openEditModal(workPackageId: string) {
+function openEditModal(workPackageId: string) {
 		const wp = $workPackages.find((w) => w.id === workPackageId);
-		if (!wp || wp.clientId) {
+		if (!wp) {
 			return;
 		}
 
@@ -41,11 +41,7 @@
 		editingWorkPackage = undefined;
 	}
 
-	function handleDelete(workPackage: WorkPackage) {
-		if (workPackage.clientId) {
-			return;
-		}
-
+function handleDelete(workPackage: WorkPackage) {
 		if (confirm('Are you sure you want to delete this work package?')) {
 			const form = deleteFormRefs[workPackage.id];
 			if (form) {
@@ -104,17 +100,9 @@
 				</thead>
 				<tbody>
 					{#each $workPackages as wp (wp.id)}
-						{@const isPending = Boolean(wp.clientId)}
-						<tr class="border-b border-gray-100 hover:bg-gray-50 {isPending ? 'opacity-70' : ''}">
+						<tr class="border-b border-gray-100 hover:bg-gray-50">
 							<td class="px-4 py-3 text-sm text-gray-900">{wp.priority + 1}</td>
-							<td class="px-4 py-3 text-sm font-medium text-gray-900">
-								<div class="flex items-center gap-2">
-									<span>{wp.title}</span>
-									{#if isPending}
-										<span class="text-xs font-semibold text-amber-600">Syncing…</span>
-									{/if}
-								</div>
-							</td>
+							<td class="px-4 py-3 text-sm font-medium text-gray-900">{wp.title}</td>
 							<td class="px-4 py-3 text-sm text-gray-900">{wp.sizeInPersonMonths}</td>
 							<td class="px-4 py-3 text-sm text-gray-600">
 								{wp.description || '—'}
@@ -133,10 +121,8 @@
 								<div class="flex justify-end gap-2">
 									<button
 										onclick={() => openEditModal(wp.id)}
-										class="text-blue-600 hover:text-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
-										disabled={isPending}
+										class="text-blue-600 hover:text-blue-800"
 										aria-label="Edit work package"
-										title={isPending ? 'Work package is syncing with the server' : 'Edit work package'}
 									>
 										<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 											<path
@@ -149,10 +135,8 @@
 									</button>
 									<button
 										onclick={() => handleDelete(wp)}
-										class="text-red-600 hover:text-red-800 disabled:cursor-not-allowed disabled:opacity-50"
-										disabled={isPending}
+										class="text-red-600 hover:text-red-800"
 										aria-label="Delete work package"
-										title={isPending ? 'Work package is syncing with the server' : 'Delete work package'}
 									>
 										<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 											<path

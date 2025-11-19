@@ -1,12 +1,14 @@
 <script lang="ts">
-	import { getContext } from 'svelte';
-	import type { Readable } from 'svelte/store';
-	import type { OptimisticEnhanceAction } from '$lib/types/optimistic';
-	import type { Team, WorkPackage, PlanningPageData } from '$lib/types';
-	import Modal from './Modal.svelte';
-	import FormError from './FormError.svelte';
-	import CapacitySparkline from './CapacitySparkline.svelte';
-	import { getNextMonths, formatYearMonth } from '$lib/utils/dates';
+import { getContext } from 'svelte';
+import type { Readable } from 'svelte/store';
+import { createAppStore } from '$lib/stores/appState';
+import type { OptimisticEnhanceAction } from '$lib/types/optimistic';
+import type { Team, WorkPackage, PlanningPageData } from '$lib/types';
+import Modal from './Modal.svelte';
+import FormError from './FormError.svelte';
+import CapacitySparkline from './CapacitySparkline.svelte';
+import { getNextMonths, formatYearMonth } from '$lib/utils/dates';
+	import { generateId } from '$lib/utils/id';
 
 	interface Props {
 		optimisticEnhance: OptimisticEnhanceAction<PlanningPageData>;
@@ -14,8 +16,9 @@
 
 	let { optimisticEnhance }: Props = $props();
 
-	// Get stores from context
-	const teams = getContext<Readable<Team[]>>('teams');
+// Get stores from context
+const appState = getContext<ReturnType<typeof createAppStore>>('appState');
+const teams = getContext<Readable<Team[]>>('teams');
 
 	let showAddModal = $state(false);
 	let editingTeam = $state<string | null>(null);
@@ -24,40 +27,40 @@
 	let nameError = $state<string | null>(null);
 	let capacityError = $state<string | null>(null);
 	let teamFormRef = $state<HTMLFormElement | null>(null);
-	let createClientId = $state<string>(crypto.randomUUID());
+let newTeamId = $state<string>(generateId());
 
-	function openAddModal() {
-		formName = '';
-		formCapacity = 0;
-		editingTeam = null;
-		nameError = null;
-		capacityError = null;
-		createClientId = crypto.randomUUID();
-		showAddModal = true;
+function openAddModal() {
+	formName = '';
+	formCapacity = 0;
+	editingTeam = null;
+	nameError = null;
+	capacityError = null;
+	newTeamId = generateId();
+	showAddModal = true;
+}
+
+function openEditModal(teamId: string) {
+	const team = $teams.find((t) => t.id === teamId);
+	if (!team) {
+		return;
 	}
 
-	function openEditModal(teamId: string) {
-		const team = $teams.find((t) => t.id === teamId);
-		if (!team || team.clientId) {
-			return;
-		}
-
-		formName = team.name;
-		formCapacity = team.monthlyCapacityInPersonMonths;
-		editingTeam = teamId;
-		nameError = null;
-		capacityError = null;
+	formName = team.name;
+	formCapacity = team.monthlyCapacityInPersonMonths;
+	editingTeam = teamId;
+	nameError = null;
+	capacityError = null;
 		showAddModal = true;
 	}
 
 	function closeModal() {
 		showAddModal = false;
-		editingTeam = null;
-		formName = '';
-		formCapacity = 0;
-		nameError = null;
-		capacityError = null;
-		createClientId = crypto.randomUUID();
+	editingTeam = null;
+	formName = '';
+	formCapacity = 0;
+	nameError = null;
+	capacityError = null;
+	newTeamId = generateId();
 	}
 
 	function validateForm(): boolean {
@@ -85,11 +88,7 @@
 		return isValid;
 	}
 
-	function handleDelete(team: Team) {
-		if (team.clientId) {
-			return;
-		}
-
+function handleDelete(team: Team) {
 		if (confirm('Are you sure you want to delete this team? Work packages will be unassigned.')) {
 			const form = document.getElementById(`delete-form-${team.id}`) as HTMLFormElement;
 			if (form) {
@@ -115,7 +114,6 @@
 	{:else}
 		<div class="space-y-4">
 			{#each $teams as team (team.id)}
-				{@const isPending = Boolean(team.clientId)}
 				<div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
 					<!-- Hidden delete form -->
 					<form
@@ -145,9 +143,6 @@
 					<div class="mb-4 flex items-center justify-between">
 						<div class="flex items-center gap-4">
 							<h3 class="text-xl font-semibold">{team.name}</h3>
-							{#if isPending}
-								<span class="text-xs font-semibold text-amber-600">Syncing…</span>
-							{/if}
 							<div class="flex items-center gap-2 text-sm text-gray-600">
 								<span>Default: {team.monthlyCapacityInPersonMonths} PM/month</span>
 								<CapacitySparkline {team} />
@@ -156,10 +151,8 @@
 						<div class="flex gap-2">
 							<button
 								onclick={() => openEditModal(team.id)}
-								class="text-blue-600 hover:text-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
-								disabled={isPending}
+								class="text-blue-600 hover:text-blue-800"
 								aria-label="Edit team"
-								title={isPending ? 'Team is syncing with the server' : 'Edit team'}
 							>
 								<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 									<path
@@ -172,10 +165,8 @@
 							</button>
 							<button
 								onclick={() => handleDelete(team)}
-								class="text-red-600 hover:text-red-800 disabled:cursor-not-allowed disabled:opacity-50"
-								disabled={isPending}
+								class="text-red-600 hover:text-red-800"
 								aria-label="Delete team"
-								title={isPending ? 'Team is syncing with the server' : 'Delete team'}
 							>
 								<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 									<path
@@ -247,15 +238,11 @@
 											step="0.1"
 											min="0"
 											value={capacity}
-											disabled={isPending}
 											onchange={(e) => {
 												// Submit the form (optimistic update will happen automatically)
 												e.currentTarget.form?.requestSubmit();
 											}}
-											class="w-full rounded border px-2 py-1 text-sm focus:outline-none focus:ring-1 {isPending
-												? 'cursor-not-allowed border-gray-200 bg-gray-50 text-gray-400'
-												: 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'}"
-											title={isPending ? 'Team is syncing with the server' : undefined}
+											class="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
 										/>
 									</form>
 								</div>
@@ -273,36 +260,38 @@
 		bind:this={teamFormRef}
 		method="POST"
 		action={editingTeam ? '?/updateTeam' : '?/createTeam'}
-		data-client-action={editingTeam ? undefined : 'create-team'}
 		use:optimisticEnhance={(data, input) => {
-			// Optimistically update the data
 			const name = input.formData.get('name') as string;
 			const monthlyCapacity = parseFloat(input.formData.get('monthlyCapacity') as string);
 			
-			if (data.initialState) {
-				if (editingTeam) {
-					// Update existing team
-					const teamIndex = data.initialState.teams.findIndex((t: Team) => t.id === editingTeam);
-					if (teamIndex !== -1) {
-						data.initialState.teams[teamIndex] = {
-							...data.initialState.teams[teamIndex],
-							name,
-							monthlyCapacityInPersonMonths: monthlyCapacity
-						};
-					}
-				} else {
-					// Add new team
-					const clientId = (input.formData.get('clientId') as string) || crypto.randomUUID();
-					const newTeam: Team = {
-						id: clientId,
-						clientId,
-						name,
-						monthlyCapacityInPersonMonths: monthlyCapacity,
-						capacityOverrides: []
-					};
-					data.initialState.teams.push(newTeam);
-				}
+			if (editingTeam) {
+				appState.update((state) => ({
+					...state,
+					teams: state.teams.map((team) =>
+						team.id === editingTeam
+							? { ...team, name, monthlyCapacityInPersonMonths: monthlyCapacity }
+							: team
+					)
+				}));
+				return;
 			}
+
+			const generatedIdRaw = input.formData.get('id');
+			if (typeof generatedIdRaw !== 'string' || generatedIdRaw.length === 0) {
+				return;
+			}
+
+			const newTeam: Team = {
+				id: generatedIdRaw,
+				name,
+				monthlyCapacityInPersonMonths: monthlyCapacity,
+				capacityOverrides: []
+			};
+
+			appState.update((state) => ({
+				...state,
+				teams: [...state.teams, newTeam]
+			}));
 		}}
 		onsubmit={(e: SubmitEvent) => {
 			e.preventDefault();
@@ -316,7 +305,7 @@
 		{#if editingTeam}
 			<input type="hidden" name="id" value={editingTeam} />
 		{:else}
-			<input type="hidden" name="clientId" value={createClientId} />
+			<input type="hidden" name="id" value={newTeamId} />
 		{/if}
 		
 		<div class="mb-4">

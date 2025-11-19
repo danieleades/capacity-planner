@@ -11,6 +11,7 @@ const nonNegativeInt = z.number().int().nonnegative();
  * Team creation validation schema
  */
 export const createTeamSchema = z.object({
+	id: z.uuid(),
 	name: z.string().min(1).max(100),
 	monthlyCapacity: positiveNumber
 });
@@ -28,6 +29,7 @@ export const updateTeamSchema = z.object({
  * Note: priority is computed server-side and not part of input validation
  */
 export const createWorkPackageSchema = z.object({
+	id: z.uuid(),
 	title: z.string().min(1).max(200),
 	description: z.string().max(1000).optional(),
 	sizeInPersonMonths: positiveNumber
@@ -49,6 +51,7 @@ export const updateWorkPackageSchema = z.object({
  * Capacity override validation schema
  */
 export const capacityOverrideSchema = z.object({
+	id: z.uuid(),
 	teamId: z.uuid(),
 	yearMonth: yearMonth,
 	capacity: z.number().nonnegative() // Allow zero for months with no capacity (e.g., holidays)

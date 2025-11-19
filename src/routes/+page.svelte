@@ -30,7 +30,7 @@ import type { ActionResult } from '@sveltejs/kit';
 
 	// Wrap page data with optimistikit() to enable optimistic updates
 	// We only need the enhance function, not the optimistic data
-	type CreateClientAction = 'create-team' | 'create-work-package';
+	type CreateClientAction = 'create-work-package';
 	type SubmitHandlerArgs = {
 		formData: FormData;
 		formElement: HTMLFormElement;
@@ -74,35 +74,17 @@ import type { ActionResult } from '@sveltejs/kit';
 		result: ActionResult;
 	}) {
 		const actionType = formElement.dataset.clientAction as CreateClientAction | undefined;
-		if (!actionType) {
+		if (actionType !== 'create-work-package') {
 			return;
 		}
 
-		const clientId = extractClientId(result) ?? getClientIdFromForm(formData);
-		if (!clientId) {
-			return;
-		}
-
-		if (result.type === 'success') {
-			const serverId = extractServerId(result);
-			if (!serverId) {
-				return;
-			}
-
-			if (actionType === 'create-team') {
-				appState.reconcileTeamId(clientId, serverId);
-			} else {
-				appState.reconcileWorkPackageId(clientId, serverId);
-			}
+		const pendingId = getIdFromForm(formData);
+		if (!pendingId) {
 			return;
 		}
 
 		if (result.type === 'failure' || result.type === 'error') {
-			if (actionType === 'create-team') {
-				appState.removeTeamByClientId(clientId);
-			} else {
-				appState.removeWorkPackageByClientId(clientId);
-			}
+			appState.deleteWorkPackage(pendingId);
 
 			if (result.type === 'error') {
 				const message =
@@ -116,25 +98,9 @@ import type { ActionResult } from '@sveltejs/kit';
 		}
 	}
 
-	function extractClientId(result: ActionResult): string | null {
-		if ('data' in result && result.data && typeof result.data === 'object') {
-			const value = (result.data as Record<string, unknown>).clientId;
-			return typeof value === 'string' ? value : null;
-		}
-		return null;
-	}
-
-	function extractServerId(result: ActionResult): string | null {
-		if (result.type !== 'success' || !result.data) {
-			return null;
-		}
-		const value = (result.data as Record<string, unknown>).id;
-		return typeof value === 'string' ? value : null;
-	}
-
-	function getClientIdFromForm(formData: FormData): string | null {
-		const value = formData.get('clientId');
-		return typeof value === 'string' ? value : null;
+	function getIdFromForm(formData: FormData): string | null {
+		const value = formData.get('id');
+		return typeof value === 'string' && value.length > 0 ? value : null;
 	}
 
 	const { enhance: optimisticEnhance } = optimistikit(

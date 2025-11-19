@@ -232,28 +232,32 @@ export const actions: Actions = {
 	},
 
 	createWorkPackage: async ({ request }) => {
-		let clientId: string | null = null;
 		try {
 			const data = await request.formData();
-			const clientIdValue = data.get('clientId');
-			clientId = typeof clientIdValue === 'string' ? clientIdValue : null;
+			const idValue = data.get('id');
+			const workPackageId = typeof idValue === 'string' && idValue.length > 0 ? idValue : null;
 			const title = data.get('title') as string;
 			const description = data.get('description') as string | null;
 			const sizeStr = data.get('sizeInPersonMonths') as string;
 
+			if (!workPackageId) {
+				return fail(400, {
+					error: 'Missing work package ID',
+					details: 'Work package ID is required'
+				});
+			}
+
 			if (!title || !sizeStr) {
 				return fail(400, {
 					error: 'Missing required fields',
-					details: 'Title and size are required',
-					clientId
+					details: 'Title and size are required'
 				});
 			}
 
 			if (title.trim().length === 0) {
 				return fail(400, {
 					error: 'Invalid title',
-					details: 'Title cannot be empty',
-					clientId
+					details: 'Title cannot be empty'
 				});
 			}
 
@@ -261,24 +265,23 @@ export const actions: Actions = {
 			if (isNaN(sizeInPersonMonths) || sizeInPersonMonths <= 0) {
 				return fail(400, {
 					error: 'Invalid size',
-					details: 'Size must be a positive number',
-					clientId
+					details: 'Size must be a positive number'
 				});
 			}
 
 			const result = await createWorkPackage({
+				id: workPackageId,
 				title: title.trim(),
 				description: description?.trim() || undefined,
 				sizeInPersonMonths
 			});
 
-			return { success: true, id: result.id, clientId };
+			return { success: true, id: result.id ?? workPackageId };
 		} catch (error) {
 			console.error('Failed to create work package:', error);
 			return fail(500, {
 				error: 'Failed to create work package',
-				details: formatErrorMessage(error),
-				clientId
+				details: formatErrorMessage(error)
 			});
 		}
 	},
@@ -307,27 +310,24 @@ export const actions: Actions = {
 	},
 
 	createTeam: async ({ request }) => {
-		let clientId: string | null = null;
 		try {
 			const data = await request.formData();
-			const clientIdValue = data.get('clientId');
-			clientId = typeof clientIdValue === 'string' ? clientIdValue : null;
+			const idValue = data.get('id');
+			const providedId = typeof idValue === 'string' && idValue.length > 0 ? idValue : null;
 			const name = data.get('name') as string;
 			const monthlyCapacityStr = data.get('monthlyCapacity') as string;
 
 			if (!name || !monthlyCapacityStr) {
 				return fail(400, {
 					error: 'Missing required fields',
-					details: 'Name and monthly capacity are required',
-					clientId
+					details: 'Name and monthly capacity are required'
 				});
 			}
 
 			if (name.trim().length === 0) {
 				return fail(400, {
 					error: 'Invalid name',
-					details: 'Name cannot be empty',
-					clientId
+					details: 'Name cannot be empty'
 				});
 			}
 
@@ -335,23 +335,29 @@ export const actions: Actions = {
 			if (isNaN(monthlyCapacity) || monthlyCapacity <= 0) {
 				return fail(400, {
 					error: 'Invalid monthly capacity',
-					details: 'Monthly capacity must be a positive number',
-					clientId
+					details: 'Monthly capacity must be a positive number'
+				});
+			}
+
+			if (!providedId) {
+				return fail(400, {
+					error: 'Missing team ID',
+					details: 'Team ID must be provided'
 				});
 			}
 
 			const result = await createTeam({
+				id: providedId,
 				name: name.trim(),
 				monthlyCapacity
 			});
 
-			return { success: true, id: result.id, clientId };
+			return { success: true, id: result.id ?? providedId };
 		} catch (error) {
 			console.error('Failed to create team:', error);
 			return fail(500, {
 				error: 'Failed to create team',
-				details: formatErrorMessage(error),
-				clientId
+				details: formatErrorMessage(error)
 			});
 		}
 	},

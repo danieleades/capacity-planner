@@ -7,10 +7,18 @@ import {
 	setCapacityOverride,
 	removeCapacityOverride
 } from './teams.repository';
+import type { CreateTeamInput } from './teams.repository';
 import { teams, capacityOverrides, workPackages } from '../schema';
 
 describe('teams repository', () => {
 	const { db, sqlite } = createTestDb();
+
+	const buildTeamInput = (overrides: Partial<CreateTeamInput> = {}): CreateTeamInput => ({
+		id: crypto.randomUUID(),
+		name: 'Test Team',
+		monthlyCapacity: 1,
+		...overrides
+	});
 
 	beforeEach(() => {
 		clearTestDb(db);
@@ -23,10 +31,10 @@ describe('teams repository', () => {
 	describe('createTeam', () => {
 		it('should create a team with generated ID and timestamps', async () => {
 			const result = await createTeam(
-				{
+				buildTeamInput({
 					name: 'Engineering Team',
 					monthlyCapacity: 5.0
-				},
+				}),
 				db
 			);
 
@@ -43,10 +51,10 @@ describe('teams repository', () => {
 		it('should throw error for invalid team data', async () => {
 			await expect(
 				createTeam(
-					{
+					buildTeamInput({
 						name: '',
 						monthlyCapacity: 5.0
-					},
+					}),
 					db
 				)
 			).rejects.toThrow();
@@ -55,10 +63,10 @@ describe('teams repository', () => {
 		it('should throw error for negative capacity', async () => {
 			await expect(
 				createTeam(
-					{
+					buildTeamInput({
 						name: 'Team',
 						monthlyCapacity: -1
-					},
+					}),
 					db
 				)
 			).rejects.toThrow();
@@ -68,10 +76,10 @@ describe('teams repository', () => {
 	describe('updateTeam', () => {
 		it('should update team name', async () => {
 			const { id } = await createTeam(
-				{
+				buildTeamInput({
 					name: 'Old Name',
 					monthlyCapacity: 3.0
-				},
+				}),
 				db
 			);
 
@@ -84,10 +92,10 @@ describe('teams repository', () => {
 
 		it('should update team capacity', async () => {
 			const { id } = await createTeam(
-				{
+				buildTeamInput({
 					name: 'Team',
 					monthlyCapacity: 3.0
-				},
+				}),
 				db
 			);
 
@@ -99,10 +107,10 @@ describe('teams repository', () => {
 
 		it('should update updatedAt timestamp', async () => {
 			const { id } = await createTeam(
-				{
+				buildTeamInput({
 					name: 'Team',
 					monthlyCapacity: 3.0
-				},
+				}),
 				db
 			);
 
@@ -120,10 +128,10 @@ describe('teams repository', () => {
 
 		it('should handle empty update gracefully', async () => {
 			const { id } = await createTeam(
-				{
+				buildTeamInput({
 					name: 'Team',
 					monthlyCapacity: 3.0
-				},
+				}),
 				db
 			);
 
@@ -137,10 +145,10 @@ describe('teams repository', () => {
 	describe('deleteTeam', () => {
 		it('should delete a team', async () => {
 			const { id } = await createTeam(
-				{
+				buildTeamInput({
 					name: 'Team to Delete',
 					monthlyCapacity: 2.0
-				},
+				}),
 				db
 			);
 
@@ -152,10 +160,10 @@ describe('teams repository', () => {
 
 		it('should cascade delete capacity overrides', async () => {
 			const { id } = await createTeam(
-				{
+				buildTeamInput({
 					name: 'Team',
 					monthlyCapacity: 2.0
-				},
+				}),
 				db
 			);
 
@@ -169,10 +177,10 @@ describe('teams repository', () => {
 
 		it('should unassign work packages from the team', async () => {
 			const { id: teamId } = await createTeam(
-				{
+				buildTeamInput({
 					name: 'Team',
 					monthlyCapacity: 2.0
-				},
+				}),
 				db
 			);
 
@@ -203,10 +211,10 @@ describe('teams repository', () => {
 	describe('setCapacityOverride', () => {
 		it('should create a new capacity override', async () => {
 			const { id } = await createTeam(
-				{
+				buildTeamInput({
 					name: 'Team',
 					monthlyCapacity: 2.0
-				},
+				}),
 				db
 			);
 
@@ -221,10 +229,10 @@ describe('teams repository', () => {
 
 		it('should update existing capacity override', async () => {
 			const { id } = await createTeam(
-				{
+				buildTeamInput({
 					name: 'Team',
 					monthlyCapacity: 2.0
-				},
+				}),
 				db
 			);
 
@@ -238,10 +246,10 @@ describe('teams repository', () => {
 
 		it('should allow multiple overrides for different months', async () => {
 			const { id } = await createTeam(
-				{
+				buildTeamInput({
 					name: 'Team',
 					monthlyCapacity: 2.0
-				},
+				}),
 				db
 			);
 
@@ -254,10 +262,10 @@ describe('teams repository', () => {
 
 		it('should throw error for invalid yearMonth format', async () => {
 			const { id } = await createTeam(
-				{
+				buildTeamInput({
 					name: 'Team',
 					monthlyCapacity: 2.0
-				},
+				}),
 				db
 			);
 
@@ -266,10 +274,10 @@ describe('teams repository', () => {
 
 		it('should throw error for negative capacity', async () => {
 			const { id } = await createTeam(
-				{
+				buildTeamInput({
 					name: 'Team',
 					monthlyCapacity: 2.0
-				},
+				}),
 				db
 			);
 
@@ -280,10 +288,10 @@ describe('teams repository', () => {
 	describe('removeCapacityOverride', () => {
 		it('should remove a capacity override', async () => {
 			const { id } = await createTeam(
-				{
+				buildTeamInput({
 					name: 'Team',
 					monthlyCapacity: 2.0
-				},
+				}),
 				db
 			);
 
@@ -296,10 +304,10 @@ describe('teams repository', () => {
 
 		it('should only remove the specified override', async () => {
 			const { id } = await createTeam(
-				{
+				buildTeamInput({
 					name: 'Team',
 					monthlyCapacity: 2.0
-				},
+				}),
 				db
 			);
 
@@ -315,10 +323,10 @@ describe('teams repository', () => {
 
 		it('should handle removing non-existent override gracefully', async () => {
 			const { id } = await createTeam(
-				{
+				buildTeamInput({
 					name: 'Team',
 					monthlyCapacity: 2.0
-				},
+				}),
 				db
 			);
 

@@ -7,11 +7,29 @@ import {
 	assignWorkPackage,
 	unassignWorkPackage
 } from './work-packages.repository';
+import type { CreateWorkPackageInput } from './work-packages.repository';
 import { createTeam } from './teams.repository';
+import type { CreateTeamInput } from './teams.repository';
 import { workPackages } from '../schema';
 
 describe('work packages repository', () => {
 	const { db, sqlite } = createTestDb();
+
+	const buildWorkPackageInput = (
+		overrides: Partial<CreateWorkPackageInput> = {}
+	): CreateWorkPackageInput => ({
+		id: crypto.randomUUID(),
+		title: 'Test Work Package',
+		sizeInPersonMonths: 1,
+		...overrides
+	});
+
+	const buildTeamInput = (overrides: Partial<CreateTeamInput> = {}): CreateTeamInput => ({
+		id: crypto.randomUUID(),
+		name: 'Test Team',
+		monthlyCapacity: 1,
+		...overrides
+	});
 
 	beforeEach(() => {
 		clearTestDb(db);
@@ -24,11 +42,11 @@ describe('work packages repository', () => {
 	describe('createWorkPackage', () => {
 		it('should create a work package with generated ID and timestamps', async () => {
 			const result = await createWorkPackage(
-				{
+				buildWorkPackageInput({
 					title: 'Feature A',
 					description: 'Build feature A',
-					sizeInPersonMonths: 2.5,
-				},
+					sizeInPersonMonths: 2.5
+				}),
 				db
 			);
 
@@ -49,10 +67,10 @@ describe('work packages repository', () => {
 
 		it('should create work package without description', async () => {
 			await createWorkPackage(
-				{
+				buildWorkPackageInput({
 					title: 'Feature B',
-					sizeInPersonMonths: 1.0,
-				},
+					sizeInPersonMonths: 1.0
+				}),
 				db
 			);
 
@@ -63,10 +81,10 @@ describe('work packages repository', () => {
 		it('should throw error for invalid work package data', async () => {
 			await expect(
 				createWorkPackage(
-					{
+					buildWorkPackageInput({
 						title: '',
-						sizeInPersonMonths: 2.0,
-					},
+						sizeInPersonMonths: 2.0
+					}),
 					db
 				)
 			).rejects.toThrow();
@@ -75,10 +93,10 @@ describe('work packages repository', () => {
 		it('should throw error for negative size', async () => {
 			await expect(
 				createWorkPackage(
-					{
+					buildWorkPackageInput({
 						title: 'Feature',
-						sizeInPersonMonths: -1,
-					},
+						sizeInPersonMonths: -1
+					}),
 					db
 				)
 			).rejects.toThrow();
@@ -88,10 +106,10 @@ describe('work packages repository', () => {
 	describe('updateWorkPackage', () => {
 		it('should update work package title', async () => {
 			const { id } = await createWorkPackage(
-				{
+				buildWorkPackageInput({
 					title: 'Old Title',
-					sizeInPersonMonths: 2.0,
-				},
+					sizeInPersonMonths: 2.0
+				}),
 				db
 			);
 
@@ -103,10 +121,10 @@ describe('work packages repository', () => {
 
 		it('should update work package size', async () => {
 			const { id } = await createWorkPackage(
-				{
+				buildWorkPackageInput({
 					title: 'Feature',
-					sizeInPersonMonths: 2.0,
-				},
+					sizeInPersonMonths: 2.0
+				}),
 				db
 			);
 
@@ -118,10 +136,10 @@ describe('work packages repository', () => {
 
 		it('should update updatedAt timestamp', async () => {
 			const { id } = await createWorkPackage(
-				{
+				buildWorkPackageInput({
 					title: 'Feature',
-					sizeInPersonMonths: 2.0,
-				},
+					sizeInPersonMonths: 2.0
+				}),
 				db
 			);
 
@@ -138,10 +156,10 @@ describe('work packages repository', () => {
 
 		it('should handle empty update gracefully', async () => {
 			const { id } = await createWorkPackage(
-				{
+				buildWorkPackageInput({
 					title: 'Feature',
-					sizeInPersonMonths: 2.0,
-				},
+					sizeInPersonMonths: 2.0
+				}),
 				db
 			);
 
@@ -155,10 +173,10 @@ describe('work packages repository', () => {
 	describe('deleteWorkPackage', () => {
 		it('should delete a work package', async () => {
 			const { id } = await createWorkPackage(
-				{
+				buildWorkPackageInput({
 					title: 'To Delete',
-					sizeInPersonMonths: 1.0,
-				},
+					sizeInPersonMonths: 1.0
+				}),
 				db
 			);
 
@@ -172,18 +190,18 @@ describe('work packages repository', () => {
 	describe('assignWorkPackage', () => {
 		it('should assign work package to team with position', async () => {
 			const team = await createTeam(
-				{
+				buildTeamInput({
 					name: 'Team A',
 					monthlyCapacity: 3.0
-				},
+				}),
 				db
 			);
 
 			const wp = await createWorkPackage(
-				{
+				buildWorkPackageInput({
 					title: 'Feature',
-					sizeInPersonMonths: 2.0,
-				},
+					sizeInPersonMonths: 2.0
+				}),
 				db
 			);
 
@@ -196,26 +214,26 @@ describe('work packages repository', () => {
 
 		it('should update assignment if already assigned', async () => {
 			const team1 = await createTeam(
-				{
+				buildTeamInput({
 					name: 'Team A',
 					monthlyCapacity: 3.0
-				},
+				}),
 				db
 			);
 
 			const team2 = await createTeam(
-				{
+				buildTeamInput({
 					name: 'Team B',
 					monthlyCapacity: 2.0
-				},
+				}),
 				db
 			);
 
 			const wp = await createWorkPackage(
-				{
+				buildWorkPackageInput({
 					title: 'Feature',
-					sizeInPersonMonths: 2.0,
-				},
+					sizeInPersonMonths: 2.0
+				}),
 				db
 			);
 
@@ -231,18 +249,18 @@ describe('work packages repository', () => {
 	describe('unassignWorkPackage', () => {
 		it('should unassign work package from team', async () => {
 			const team = await createTeam(
-				{
+				buildTeamInput({
 					name: 'Team A',
 					monthlyCapacity: 3.0
-				},
+				}),
 				db
 			);
 
 			const wp = await createWorkPackage(
-				{
+				buildWorkPackageInput({
 					title: 'Feature',
-					sizeInPersonMonths: 2.0,
-				},
+					sizeInPersonMonths: 2.0
+				}),
 				db
 			);
 
@@ -256,10 +274,10 @@ describe('work packages repository', () => {
 
 		it('should handle unassigning already unassigned work package', async () => {
 			const wp = await createWorkPackage(
-				{
+				buildWorkPackageInput({
 					title: 'Feature',
-					sizeInPersonMonths: 2.0,
-				},
+					sizeInPersonMonths: 2.0
+				}),
 				db
 			);
 

@@ -1,8 +1,11 @@
 <script lang="ts">
-	import Modal from './Modal.svelte';
-	import WorkPackageForm from './WorkPackageForm.svelte';
-	import type { WorkPackage, PlanningPageData } from '$lib/types';
-	import type { OptimisticEnhanceAction } from '$lib/types/optimistic';
+import { getContext } from 'svelte';
+import { createAppStore } from '$lib/stores/appState';
+import Modal from './Modal.svelte';
+import WorkPackageForm from './WorkPackageForm.svelte';
+import type { WorkPackage, PlanningPageData } from '$lib/types';
+import type { OptimisticEnhanceAction } from '$lib/types/optimistic';
+import { generateId } from '$lib/utils/id';
 
 	interface Props {
 		optimisticEnhance: OptimisticEnhanceAction<PlanningPageData>;
@@ -18,21 +21,25 @@
 	let formSize = $state(0);
 	let formDescription = $state('');
 	let workPackageFormRef = $state<HTMLFormElement | null>(null);
-	let createClientId = $state<string>(crypto.randomUUID());
+let newWorkPackageId = $state<string>(generateId());
+const appState = getContext<ReturnType<typeof createAppStore>>('appState');
 
 	// Update form when editingWorkPackage changes
-	$effect(() => {
-		if (editingWorkPackage) {
-			formTitle = editingWorkPackage.title;
-			formSize = editingWorkPackage.sizeInPersonMonths;
-			formDescription = editingWorkPackage.description || '';
-		} else {
-			formTitle = '';
-			formSize = 0;
-			formDescription = '';
-			createClientId = crypto.randomUUID();
-		}
-	});
+$effect(() => {
+	if (editingWorkPackage) {
+		formTitle = editingWorkPackage.title;
+		formSize = editingWorkPackage.sizeInPersonMonths;
+		formDescription = editingWorkPackage.description || '';
+		return;
+	}
+
+	if (open) {
+		formTitle = '';
+		formSize = 0;
+		formDescription = '';
+		newWorkPackageId = generateId();
+	}
+});
 
 	function handleSubmit(title: string, size: number, description?: string) {
 		// Update form values and submit the form to trigger server action
@@ -59,46 +66,51 @@
 		action={editingWorkPackage ? '?/updateWorkPackage' : '?/createWorkPackage'}
 		data-client-action={editingWorkPackage ? undefined : 'create-work-package'}
 		use:optimisticEnhance={(data, input) => {
-			// Optimistically update the data
 			const title = input.formData.get('title') as string;
 			const sizeInPersonMonths = parseFloat(input.formData.get('sizeInPersonMonths') as string);
 			const description = input.formData.get('description') as string | null;
-			
-			if (data.initialState) {
-				if (editingWorkPackage) {
-					// Update existing work package
-					const wpIndex = data.initialState.workPackages.findIndex(
-						(wp: WorkPackage) => wp.id === editingWorkPackage.id
-					);
-					if (wpIndex !== -1) {
-						data.initialState.workPackages[wpIndex] = {
-							...data.initialState.workPackages[wpIndex],
-							title,
-							sizeInPersonMonths,
-							description: description || undefined
-						};
-					}
-				} else {
-					// Add new work package - compute priority from max existing priority
-					const clientId = (input.formData.get('clientId') as string) || crypto.randomUUID();
-					const maxPriority = data.initialState.workPackages.reduce(
-						(max: number, wp: WorkPackage) => Math.max(max, wp.priority),
-						-1
-					);
-					
-					const newWorkPackage: WorkPackage = {
-						id: clientId,
-						clientId,
-						title,
-						sizeInPersonMonths,
-						description: description || undefined,
-						priority: maxPriority + 1,
-						assignedTeamId: undefined,
-						scheduledPosition: undefined
-					};
-					data.initialState.workPackages.push(newWorkPackage);
-				}
+			const idValue = input.formData.get('id');
+			if (typeof idValue !== 'string' || idValue.length === 0) {
+				return;
 			}
+
+			appState.update((state) => {
+				if (editingWorkPackage) {
+					return {
+						...state,
+						workPackages: state.workPackages.map((wp) =>
+							wp.id === editingWorkPackage.id
+								? {
+										...wp,
+										title,
+										sizeInPersonMonths,
+										description: description || undefined
+								  }
+								: wp
+						)
+					};
+				}
+
+				const maxPriority =
+					state.workPackages.length === 0
+						? -1
+						: Math.max(...state.workPackages.map((wp) => wp.priority));
+
+				const newWorkPackage: WorkPackage = {
+					id: idValue,
+					title,
+					sizeInPersonMonths,
+					description: description || undefined,
+					priority: maxPriority + 1,
+					assignedTeamId: undefined,
+					scheduledPosition: undefined
+				};
+
+				return {
+					...state,
+					workPackages: [...state.workPackages, newWorkPackage]
+				};
+			});
 		}}
 		onsubmit={(e: SubmitEvent) => {
 			e.preventDefault();
@@ -108,7 +120,7 @@
 		{#if editingWorkPackage}
 			<input type="hidden" name="id" value={editingWorkPackage.id} />
 		{:else}
-			<input type="hidden" name="clientId" value={createClientId} />
+			<input type="hidden" name="id" value={newWorkPackageId} />
 		{/if}
 		
 		<WorkPackageForm

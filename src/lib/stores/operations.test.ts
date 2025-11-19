@@ -9,11 +9,7 @@ import {
 	updateWorkPackage,
 	deleteWorkPackage,
 	assignWorkPackage,
-	reorderWorkPackages,
-	reconcileTeamClientId,
-	removeTeamByClientId,
-	reconcileWorkPackageClientId,
-	removeWorkPackageByClientId
+	reorderWorkPackages
 } from './operations';
 import type { AppState } from '$lib/types';
 import { createMockTeam, createMockWorkPackage } from '../../test/utils/test-data';
@@ -305,47 +301,4 @@ describe('store operations', () => {
 		});
 	});
 
-	describe('optimistic reconciliation helpers', () => {
-		it('reconcileTeamClientId swaps client ids for server ids', () => {
-			const team = createMockTeam({ id: 'temp-team', clientId: 'temp-team' });
-			const wp = createMockWorkPackage({ assignedTeamId: 'temp-team' });
-			const state: AppState = { teams: [team], workPackages: [wp] };
-
-			const result = reconcileTeamClientId(state, 'temp-team', 'server-team');
-
-			expect(result.teams[0].id).toBe('server-team');
-			expect(result.teams[0].clientId).toBeUndefined();
-			expect(result.workPackages[0].assignedTeamId).toBe('server-team');
-		});
-
-		it('removeTeamByClientId drops pending teams and unassigns references', () => {
-			const team = createMockTeam({ id: 'temp-team', clientId: 'temp-team' });
-			const wp = createMockWorkPackage({ assignedTeamId: 'temp-team' });
-			const state: AppState = { teams: [team], workPackages: [wp] };
-
-			const result = removeTeamByClientId(state, 'temp-team');
-
-			expect(result.teams).toHaveLength(0);
-			expect(result.workPackages[0].assignedTeamId).toBeUndefined();
-		});
-
-		it('reconcileWorkPackageClientId updates ids and clears metadata', () => {
-			const wp = createMockWorkPackage({ id: 'temp-wp', clientId: 'temp-wp' });
-			const state: AppState = { teams: [], workPackages: [wp] };
-
-			const result = reconcileWorkPackageClientId(state, 'temp-wp', 'server-wp');
-
-			expect(result.workPackages[0].id).toBe('server-wp');
-			expect(result.workPackages[0].clientId).toBeUndefined();
-		});
-
-		it('removeWorkPackageByClientId removes pending work packages', () => {
-			const wp = createMockWorkPackage({ id: 'temp-wp', clientId: 'temp-wp' });
-			const state: AppState = { teams: [], workPackages: [wp] };
-
-			const result = removeWorkPackageByClientId(state, 'temp-wp');
-
-			expect(result.workPackages).toHaveLength(0);
-		});
-	});
 });

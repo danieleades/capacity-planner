@@ -13,14 +13,14 @@ export type CapacityOverride = InferSelectModel<typeof capacityOverrides>;
  * Input types for creating new entities
  * Omits id and timestamps which are generated automatically
  */
-export type NewTeam = Omit<InferInsertModel<typeof teams>, 'id' | 'createdAt' | 'updatedAt'>;
+export type NewTeam = Omit<InferInsertModel<typeof teams>, 'createdAt' | 'updatedAt'>;
 export type NewWorkPackage = Omit<
 	InferInsertModel<typeof workPackages>,
-	'id' | 'createdAt' | 'updatedAt' | 'priority'
+	'createdAt' | 'updatedAt' | 'priority'
 >;
 export type NewCapacityOverride = Omit<
 	InferInsertModel<typeof capacityOverrides>,
-	'id' | 'createdAt' | 'updatedAt'
+	'createdAt' | 'updatedAt'
 >;
 
 /**

@@ -53,25 +53,6 @@ export const createAppStore = (initialState?: AppState) => {
 			update((state) => ops.assignWorkPackage(state, workPackageId, teamId));
 		},
 
-		reconcileTeamId: (clientId: string, serverId: string) => {
-			if (!clientId) return;
-			update((state) => ops.reconcileTeamClientId(state, clientId, serverId));
-		},
-
-		reconcileWorkPackageId: (clientId: string, serverId: string) => {
-			if (!clientId) return;
-			update((state) => ops.reconcileWorkPackageClientId(state, clientId, serverId));
-		},
-
-		removeTeamByClientId: (clientId: string) => {
-			if (!clientId) return;
-			update((state) => ops.removeTeamByClientId(state, clientId));
-		},
-
-		removeWorkPackageByClientId: (clientId: string) => {
-			if (!clientId) return;
-			update((state) => ops.removeWorkPackageByClientId(state, clientId));
-		}
 	};
 };
 

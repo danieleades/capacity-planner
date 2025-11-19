@@ -28,11 +28,14 @@ export function dbOperation<T>(
  * Helper for insert operations with timestamps and ID generation
  * Combines multiple operations that always happen together
  */
-export function withTimestamps<T extends Record<string, unknown>>(data: T) {
+export function withTimestamps<T extends { id: string }>(data: T) {
+	if (!data.id) {
+		throw new Error('withTimestamps requires an id field');
+	}
+
 	const now = new Date();
 	return {
 		...data,
-		id: crypto.randomUUID(),
 		createdAt: now,
 		updatedAt: now
 	};

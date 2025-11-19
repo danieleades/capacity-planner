@@ -144,7 +144,7 @@ describe('WorkPackageModal', () => {
 			expect(hiddenIdInput).toHaveValue('wp-1');
 		});
 
-		it('should not include hidden id field when creating', () => {
+		it('should include hidden id field when creating', () => {
 			const { container } = render(WorkPackageModal, {
 				props: {
 					optimisticEnhance: mockOptimisticEnhance,
@@ -153,22 +153,9 @@ describe('WorkPackageModal', () => {
 				}
 			});
 
-			const hiddenIdInput = container.querySelector('input[type="hidden"][name="id"]');
-			expect(hiddenIdInput).not.toBeInTheDocument();
-		});
-
-		it('should include hidden clientId field when creating', () => {
-			const { container } = render(WorkPackageModal, {
-				props: {
-					optimisticEnhance: mockOptimisticEnhance,
-					open: true,
-					onClose: mockOnClose
-				}
-			});
-
-			const clientIdInput = container.querySelector('input[type="hidden"][name="clientId"]') as HTMLInputElement | null;
-			expect(clientIdInput).toBeInTheDocument();
-			expect(clientIdInput?.value).toBeTruthy();
+			const idInput = container.querySelector('input[type="hidden"][name="id"]') as HTMLInputElement | null;
+			expect(idInput).toBeInTheDocument();
+			expect(idInput?.value).toBeTruthy();
 		});
 	});
 

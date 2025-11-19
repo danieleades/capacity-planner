@@ -144,18 +144,6 @@
 		const items = e.detail.items as WorkPackage[];
 		const newTeamId = columnId === 'unassigned' ? undefined : columnId;
 
-		const draggedId = e.detail.info?.id;
-		const draggedWorkPackage = $appState.workPackages.find((wp) => wp.id === draggedId);
-		if (draggedWorkPackage?.clientId) {
-			const windowWithHandler = window as Window & {
-				handleFormError?: (msg: string) => void;
-			};
-			if (typeof window !== 'undefined' && windowWithHandler.handleFormError) {
-				windowWithHandler.handleFormError('Please wait for the new work package to finish syncing before moving it.');
-			}
-			columns = buildColumns();
-			return;
-		}
 
 		// Update local state first
 		columns = columns.map((col) => {
@@ -170,21 +158,18 @@
 			id: string;
 			teamId: string | null;
 			position: number;
-			isPending: boolean;
 		};
 		const updates: LocalReorderUpdate[] = items.map((wp, index) => ({
 			id: wp.id,
 			teamId: newTeamId ?? null,
 			position: index,
-			isPending: Boolean(wp.clientId)
+			isPending: false
 		}));
-		const persistedUpdates = updates
-			.filter((update) => !update.isPending)
-			.map((update, index) => ({
-				id: update.id,
-				teamId: update.teamId,
-				position: index
-			}));
+		const persistedUpdates = updates.map((update, index) => ({
+			id: update.id,
+			teamId: update.teamId,
+			position: index
+		}));
 
 		// Optimistically update the store
 		appState.update((state) => {
@@ -391,16 +376,8 @@
 					onfinalize={(e) => handleDndFinalize(column.id, e)}
 				>
 					{#each column.items as wp (wp.id)}
-						<div
-							class="mb-2 rounded border border-gray-300 bg-white p-3 shadow-sm {wp.clientId
-								? 'cursor-progress opacity-60 pointer-events-none'
-								: 'cursor-move'}"
-							title={wp.clientId ? 'Work package is syncing with the server' : undefined}
-						>
+						<div class="mb-2 cursor-move rounded border border-gray-300 bg-white p-3 shadow-sm">
 							<h4 class="mb-1 font-medium">{wp.title}</h4>
-							{#if wp.clientId}
-								<p class="mb-1 text-xs font-semibold text-amber-600">Syncing…</p>
-							{/if}
 							{#if wp.description}
 								<p class="mb-2 text-xs text-gray-600">{wp.description}</p>
 							{/if}

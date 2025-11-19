@@ -104,7 +104,12 @@ export async function setCapacityOverride(
 ): Promise<void> {
 	return dbOperation(async () => {
 		try {
-			const validated = capacityOverrideValidation.create.parse({ teamId, yearMonth, capacity });
+			const validated = capacityOverrideValidation.create.parse({
+				id: crypto.randomUUID(),
+				teamId,
+				yearMonth,
+				capacity
+			});
 
 			const existing = await db
 				.select()

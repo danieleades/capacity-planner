@@ -2,10 +2,27 @@ import { describe, it, expect, beforeEach, afterAll } from 'vitest';
 import { createTestDb, clearTestDb, closeTestDb } from '../../../test/utils/test-db';
 import { getPlanningView } from './planning.repository';
 import { createTeam, setCapacityOverride } from './teams.repository';
+import type { CreateTeamInput } from './teams.repository';
 import { createWorkPackage, assignWorkPackage } from './work-packages.repository';
+import type { CreateWorkPackageInput } from './work-packages.repository';
 
 describe('planning repository', () => {
 	const { db, sqlite } = createTestDb();
+	const buildTeamInput = (overrides: Partial<CreateTeamInput> = {}): CreateTeamInput => ({
+		id: crypto.randomUUID(),
+		name: 'Test Team',
+		monthlyCapacity: 1,
+		...overrides
+	});
+
+	const buildWorkPackageInput = (
+		overrides: Partial<CreateWorkPackageInput> = {}
+	): CreateWorkPackageInput => ({
+		id: crypto.randomUUID(),
+		title: 'Test Work Package',
+		sizeInPersonMonths: 1,
+		...overrides
+	});
 
 	beforeEach(() => {
 		clearTestDb(db);
@@ -25,18 +42,18 @@ describe('planning repository', () => {
 
 		it('should return teams with no work packages', async () => {
 			await createTeam(
-				{
+				buildTeamInput({
 					name: 'Team A',
 					monthlyCapacity: 3.0
-				},
+				}),
 				db
 			);
 
 			await createTeam(
-				{
+				buildTeamInput({
 					name: 'Team B',
 					monthlyCapacity: 2.5
-				},
+				}),
 				db
 			);
 
@@ -52,10 +69,10 @@ describe('planning repository', () => {
 
 		it('should include capacity overrides for teams', async () => {
 			const team = await createTeam(
-				{
+				buildTeamInput({
 					name: 'Team A',
 					monthlyCapacity: 3.0
-				},
+				}),
 				db
 			);
 
@@ -78,26 +95,26 @@ describe('planning repository', () => {
 
 		it('should return unassigned work packages sorted by priority', async () => {
 			await createWorkPackage(
-				{
+				buildWorkPackageInput({
 					title: 'Feature C',
-					sizeInPersonMonths: 1.0,
-				},
+					sizeInPersonMonths: 1.0
+				}),
 				db
 			);
 
 			await createWorkPackage(
-				{
+				buildWorkPackageInput({
 					title: 'Feature A',
-					sizeInPersonMonths: 2.0,
-				},
+					sizeInPersonMonths: 2.0
+				}),
 				db
 			);
 
 			await createWorkPackage(
-				{
+				buildWorkPackageInput({
 					title: 'Feature B',
-					sizeInPersonMonths: 1.5,
-				},
+					sizeInPersonMonths: 1.5
+				}),
 				db
 			);
 
@@ -116,34 +133,34 @@ describe('planning repository', () => {
 
 		it('should assign work packages to correct teams', async () => {
 			const teamA = await createTeam(
-				{
+				buildTeamInput({
 					name: 'Team A',
 					monthlyCapacity: 3.0
-				},
+				}),
 				db
 			);
 
 			const teamB = await createTeam(
-				{
+				buildTeamInput({
 					name: 'Team B',
 					monthlyCapacity: 2.0
-				},
+				}),
 				db
 			);
 
 			const wp1 = await createWorkPackage(
-				{
+				buildWorkPackageInput({
 					title: 'Feature 1',
-					sizeInPersonMonths: 2.0,
-				},
+					sizeInPersonMonths: 2.0
+				}),
 				db
 			);
 
 			const wp2 = await createWorkPackage(
-				{
+				buildWorkPackageInput({
 					title: 'Feature 2',
-					sizeInPersonMonths: 1.5,
-				},
+					sizeInPersonMonths: 1.5
+				}),
 				db
 			);
 
@@ -161,34 +178,34 @@ describe('planning repository', () => {
 
 		it('should sort work packages by scheduled position within teams', async () => {
 			const team = await createTeam(
-				{
+				buildTeamInput({
 					name: 'Team A',
 					monthlyCapacity: 3.0
-				},
+				}),
 				db
 			);
 
 			const wp1 = await createWorkPackage(
-				{
+				buildWorkPackageInput({
 					title: 'Feature 1',
-					sizeInPersonMonths: 1.0,
-				},
+					sizeInPersonMonths: 1.0
+				}),
 				db
 			);
 
 			const wp2 = await createWorkPackage(
-				{
+				buildWorkPackageInput({
 					title: 'Feature 2',
-					sizeInPersonMonths: 1.0,
-				},
+					sizeInPersonMonths: 1.0
+				}),
 				db
 			);
 
 			const wp3 = await createWorkPackage(
-				{
+				buildWorkPackageInput({
 					title: 'Feature 3',
-					sizeInPersonMonths: 1.0,
-				},
+					sizeInPersonMonths: 1.0
+				}),
 				db
 			);
 
@@ -210,26 +227,26 @@ describe('planning repository', () => {
 
 		it('should handle work packages with null scheduled position', async () => {
 			const team = await createTeam(
-				{
+				buildTeamInput({
 					name: 'Team A',
 					monthlyCapacity: 3.0
-				},
+				}),
 				db
 			);
 
 			const wp1 = await createWorkPackage(
-				{
+				buildWorkPackageInput({
 					title: 'Feature 1',
-					sizeInPersonMonths: 1.0,
-				},
+					sizeInPersonMonths: 1.0
+				}),
 				db
 			);
 
 			const wp2 = await createWorkPackage(
-				{
+				buildWorkPackageInput({
 					title: 'Feature 2',
-					sizeInPersonMonths: 1.0,
-				},
+					sizeInPersonMonths: 1.0
+				}),
 				db
 			);
 
@@ -245,45 +262,45 @@ describe('planning repository', () => {
 
 		it('should return complete planning view with all data', async () => {
 			const teamA = await createTeam(
-				{
+				buildTeamInput({
 					name: 'Team A',
 					monthlyCapacity: 3.0
-				},
+				}),
 				db
 			);
 
 			const teamB = await createTeam(
-				{
+				buildTeamInput({
 					name: 'Team B',
 					monthlyCapacity: 2.5
-				},
+				}),
 				db
 			);
 
 			await setCapacityOverride(teamA.id, '2025-01', 4.0, db);
 
 			const wp1 = await createWorkPackage(
-				{
+				buildWorkPackageInput({
 					title: 'Assigned to A',
 					description: 'Work for team A',
-					sizeInPersonMonths: 2.0,
-				},
+					sizeInPersonMonths: 2.0
+				}),
 				db
 			);
 
 			const wp2 = await createWorkPackage(
-				{
+				buildWorkPackageInput({
 					title: 'Assigned to B',
-					sizeInPersonMonths: 1.5,
-				},
+					sizeInPersonMonths: 1.5
+				}),
 				db
 			);
 
 			await createWorkPackage(
-				{
+				buildWorkPackageInput({
 					title: 'Unassigned',
-					sizeInPersonMonths: 1.0,
-				},
+					sizeInPersonMonths: 1.0
+				}),
 				db
 			);
 

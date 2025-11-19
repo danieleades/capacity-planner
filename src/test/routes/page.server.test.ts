@@ -2,13 +2,39 @@ import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest';
 import { createTestDb, clearTestDb, closeTestDb } from '../utils/test-db';
 import { load, actions } from '../../routes/+page.server';
 import { createTeam, setCapacityOverride } from '$lib/server/repositories/teams.repository';
+import type { CreateTeamInput } from '$lib/server/repositories/teams.repository';
 import { createWorkPackage, assignWorkPackage } from '$lib/server/repositories/work-packages.repository';
+import type { CreateWorkPackageInput } from '$lib/server/repositories/work-packages.repository';
 import type { RequestEvent } from '@sveltejs/kit';
 import type { WorkPackage } from '$lib/types';
 
 // Mock the repository modules to use our test database
 let testDb: ReturnType<typeof createTestDb>['db'];
 let testSqlite: ReturnType<typeof createTestDb>['sqlite'];
+
+const buildTeamInput = (overrides: Partial<CreateTeamInput> = {}): CreateTeamInput => ({
+	id: crypto.randomUUID(),
+	name: 'Test Team',
+	monthlyCapacity: 1,
+	...overrides
+});
+
+const buildWorkPackageInput = (
+	overrides: Partial<CreateWorkPackageInput> = {}
+): CreateWorkPackageInput => ({
+	id: crypto.randomUUID(),
+	title: 'Test Work Package',
+	sizeInPersonMonths: 1,
+	...overrides
+});
+
+function insertTeam(overrides: Partial<CreateTeamInput> = {}) {
+	return createTeam(buildTeamInput(overrides), testDb);
+}
+
+function insertWorkPackage(overrides: Partial<CreateWorkPackageInput> = {}) {
+	return createWorkPackage(buildWorkPackageInput(overrides), testDb);
+}
 
 // Helper type for creating mock request events
 type MockRequestEvent = Pick<RequestEvent, 'request'>;
@@ -120,21 +146,15 @@ describe('Planning Page Routes', () => {
 		});
 
 		it('should load planning view with teams and work packages', async () => {
-			const team = await createTeam(
-				{
-					name: 'Test Team',
-					monthlyCapacity: 3.0
-				},
-				testDb
-			);
+			const team = await insertTeam({
+				name: 'Test Team',
+				monthlyCapacity: 3.0
+			});
 
-			const wp = await createWorkPackage(
-				{
-					title: 'Test Work Package',
-					sizeInPersonMonths: 2.0,
-				},
-				testDb
-			);
+			const wp = await insertWorkPackage({
+				title: 'Test Work Package',
+				sizeInPersonMonths: 2.0
+			});
 
 			await assignWorkPackage(wp.id, team.id, 0, testDb);
 
@@ -151,13 +171,10 @@ describe('Planning Page Routes', () => {
 		});
 
 		it('should load planning view with capacity overrides', async () => {
-			const team = await createTeam(
-				{
-					name: 'Test Team',
-					monthlyCapacity: 3.0
-				},
-				testDb
-			);
+			const team = await insertTeam({
+				name: 'Test Team',
+				monthlyCapacity: 3.0
+			});
 
 			await setCapacityOverride(team.id, '2025-12', 4.5, testDb);
 
@@ -176,24 +193,18 @@ describe('Planning Page Routes', () => {
 
 		it('should return data matching PlanningPageData structure with all required fields', async () => {
 			// Create test data
-			const team = await createTeam(
-				{
-					name: 'Test Team',
-					monthlyCapacity: 3.0
-				},
-				testDb
-			);
+			const team = await insertTeam({
+				name: 'Test Team',
+				monthlyCapacity: 3.0
+			});
 
 			await setCapacityOverride(team.id, '2025-12', 4.5, testDb);
 
-			const wp = await createWorkPackage(
-				{
-					title: 'Test Work Package',
-					description: 'Test description',
-					sizeInPersonMonths: 2.0,
-				},
-				testDb
-			);
+			const wp = await insertWorkPackage({
+				title: 'Test Work Package',
+				description: 'Test description',
+				sizeInPersonMonths: 2.0
+			});
 
 			await assignWorkPackage(wp.id, team.id, 0, testDb);
 
@@ -244,13 +255,10 @@ describe('Planning Page Routes', () => {
 
 	describe('updateCapacity action', () => {
 		it('should update capacity override successfully', async () => {
-			const team = await createTeam(
-				{
-					name: 'Test Team',
-					monthlyCapacity: 3.0
-				},
-				testDb
-			);
+			const team = await insertTeam({
+				name: 'Test Team',
+				monthlyCapacity: 3.0
+			});
 
 			const formData = new FormData();
 			formData.set('teamId', team.id);
@@ -312,21 +320,15 @@ describe('Planning Page Routes', () => {
 
 	describe('assignWorkPackage action', () => {
 		it('should assign work package to team successfully', async () => {
-			const team = await createTeam(
-				{
-					name: 'Test Team',
-					monthlyCapacity: 3.0
-				},
-				testDb
-			);
+			const team = await insertTeam({
+				name: 'Test Team',
+				monthlyCapacity: 3.0
+			});
 
-			const wp = await createWorkPackage(
-				{
-					title: 'Test Work Package',
-					sizeInPersonMonths: 2.0,
-				},
-				testDb
-			);
+			const wp = await insertWorkPackage({
+				title: 'Test Work Package',
+				sizeInPersonMonths: 2.0
+			});
 
 			const formData = new FormData();
 			formData.set('workPackageId', wp.id);
@@ -349,21 +351,15 @@ describe('Planning Page Routes', () => {
 		});
 
 		it('should unassign work package when teamId is empty', async () => {
-			const team = await createTeam(
-				{
-					name: 'Test Team',
-					monthlyCapacity: 3.0
-				},
-				testDb
-			);
+			const team = await insertTeam({
+				name: 'Test Team',
+				monthlyCapacity: 3.0
+			});
 
-			const wp = await createWorkPackage(
-				{
-					title: 'Test Work Package',
-					sizeInPersonMonths: 2.0,
-				},
-				testDb
-			);
+			const wp = await insertWorkPackage({
+				title: 'Test Work Package',
+				sizeInPersonMonths: 2.0
+			});
 
 			await assignWorkPackage(wp.id, team.id, 0, testDb);
 
@@ -401,21 +397,15 @@ describe('Planning Page Routes', () => {
 		});
 
 		it('should return error when position is invalid', async () => {
-			const team = await createTeam(
-				{
-					name: 'Test Team',
-					monthlyCapacity: 3.0
-				},
-				testDb
-			);
+			const team = await insertTeam({
+				name: 'Test Team',
+				monthlyCapacity: 3.0
+			});
 
-			const wp = await createWorkPackage(
-				{
-					title: 'Test Work Package',
-					sizeInPersonMonths: 2.0,
-				},
-				testDb
-			);
+			const wp = await insertWorkPackage({
+				title: 'Test Work Package',
+				sizeInPersonMonths: 2.0
+			});
 
 			const formData = new FormData();
 			formData.set('workPackageId', wp.id);
@@ -430,13 +420,10 @@ describe('Planning Page Routes', () => {
 		});
 
 		it('should return error when team does not exist', async () => {
-			const wp = await createWorkPackage(
-				{
-					title: 'Test Work Package',
-					sizeInPersonMonths: 2.0,
-				},
-				testDb
-			);
+			const wp = await insertWorkPackage({
+				title: 'Test Work Package',
+				sizeInPersonMonths: 2.0
+			});
 
 			const formData = new FormData();
 			formData.set('workPackageId', wp.id);
@@ -461,19 +448,18 @@ describe('Planning Page Routes', () => {
 	describe('createWorkPackage action', () => {
 		it('should create work package successfully', async () => {
 			const formData = new FormData();
+			const generatedId = crypto.randomUUID();
+			formData.set('id', generatedId);
 			formData.set('title', 'New Work Package');
 			formData.set('description', 'Test description');
 			formData.set('sizeInPersonMonths', '2.5');
 			formData.set('priority', '1');
-			const clientId = 'wp-client-123';
-			formData.set('clientId', clientId);
 
 			const mockEvent = createMockRequest(formData);
 			const result = await actions.createWorkPackage(mockEvent as Parameters<typeof actions.createWorkPackage>[0]);
 
 			expect(result).toHaveProperty('success', true);
-			expect(result).toHaveProperty('id');
-			expect(result).toHaveProperty('clientId', clientId);
+			expect(result).toHaveProperty('id', generatedId);
 
 			// Verify the work package was created
 			const view = await load({} as Parameters<typeof load>[0]);
@@ -488,10 +474,10 @@ describe('Planning Page Routes', () => {
 
 		it('should create work package without description', async () => {
 			const formData = new FormData();
+			formData.set('id', crypto.randomUUID());
 			formData.set('title', 'New Work Package');
 			formData.set('sizeInPersonMonths', '2.5');
 			formData.set('priority', '1');
-			formData.set('clientId', 'wp-client-234');
 
 			const mockEvent = createMockRequest(formData);
 			const result = await actions.createWorkPackage(mockEvent as Parameters<typeof actions.createWorkPackage>[0]);
@@ -508,48 +494,49 @@ describe('Planning Page Routes', () => {
 
 		it('should return error when title is missing', async () => {
 			const formData = new FormData();
+			formData.set('id', crypto.randomUUID());
 			formData.set('sizeInPersonMonths', '2.5');
 			formData.set('priority', '1');
-			const clientId = 'wp-client-missing-title';
-			formData.set('clientId', clientId);
 
 			const mockEvent = createMockRequest(formData);
 			const result = await actions.createWorkPackage(mockEvent as Parameters<typeof actions.createWorkPackage>[0]);
 
 			expect(result).toHaveProperty('status', 400);
 			expectErrorMessage(result, 'Missing required fields');
-			if (result && typeof result === 'object' && 'data' in result) {
-				expect((result as { data: { clientId?: string } }).data.clientId).toBe(clientId);
-			}
 		});
 
 		it('should return error when sizeInPersonMonths is invalid', async () => {
 			const formData = new FormData();
+			formData.set('id', crypto.randomUUID());
 			formData.set('title', 'New Work Package');
 			formData.set('sizeInPersonMonths', 'invalid');
-			const clientId = 'wp-client-invalid-size';
-			formData.set('clientId', clientId);
 
 			const mockEvent = createMockRequest(formData);
 			const result = await actions.createWorkPackage(mockEvent as Parameters<typeof actions.createWorkPackage>[0]);
 
 			expect(result).toHaveProperty('status', 400);
 			expectErrorMessage(result, 'Invalid size');
-			if (result && typeof result === 'object' && 'data' in result) {
-				expect((result as { data: { clientId?: string } }).data.clientId).toBe(clientId);
-			}
+		});
+
+		it('should return error when id is missing', async () => {
+			const formData = new FormData();
+			formData.set('title', 'New Work Package');
+			formData.set('sizeInPersonMonths', '2.5');
+
+			const mockEvent = createMockRequest(formData);
+			const result = await actions.createWorkPackage(mockEvent as Parameters<typeof actions.createWorkPackage>[0]);
+
+			expect(result).toHaveProperty('status', 400);
+			expectErrorMessage(result, 'Missing work package ID');
 		});
 	});
 
 	describe('deleteWorkPackage action', () => {
 		it('should delete work package successfully', async () => {
-			const wp = await createWorkPackage(
-				{
-					title: 'Test Work Package',
-					sizeInPersonMonths: 2.0,
-				},
-				testDb
-			);
+			const wp = await insertWorkPackage({
+				title: 'Test Work Package',
+				sizeInPersonMonths: 2.0
+			});
 
 			const formData = new FormData();
 			formData.set('id', wp.id);
@@ -581,17 +568,16 @@ describe('Planning Page Routes', () => {
 	describe('createTeam action', () => {
 		it('should create team and persist to database', async () => {
 			const formData = new FormData();
+			const generatedId = crypto.randomUUID();
+			formData.set('id', generatedId);
 			formData.set('name', 'Engineering Team');
 			formData.set('monthlyCapacity', '5.0');
-			const clientId = 'team-client-123';
-			formData.set('clientId', clientId);
 
 			const mockEvent = createMockRequest(formData);
 			const result = await actions.createTeam(mockEvent as Parameters<typeof actions.createTeam>[0]);
 
 			expect(result).toHaveProperty('success', true);
-			expect(result).toHaveProperty('id');
-			expect(result).toHaveProperty('clientId', clientId);
+			expect(result).toHaveProperty('id', generatedId);
 
 			// Verify the team was persisted to database
 			const view = await load({} as Parameters<typeof load>[0]);
@@ -606,46 +592,47 @@ describe('Planning Page Routes', () => {
 		it('should return error when name is missing', async () => {
 			const formData = new FormData();
 			formData.set('monthlyCapacity', '5.0');
-			const clientId = 'team-client-missing-name';
-			formData.set('clientId', clientId);
+			formData.set('id', crypto.randomUUID());
 
 			const mockEvent = createMockRequest(formData);
 			const result = await actions.createTeam(mockEvent as Parameters<typeof actions.createTeam>[0]);
 
 			expect(result).toHaveProperty('status', 400);
 			expectErrorMessage(result, 'Missing required fields');
-			if (result && typeof result === 'object' && 'data' in result) {
-				expect((result as { data: { clientId?: string } }).data.clientId).toBe(clientId);
-			}
 		});
 
 		it('should return error when monthlyCapacity is invalid', async () => {
 			const formData = new FormData();
 			formData.set('name', 'Engineering Team');
 			formData.set('monthlyCapacity', 'invalid');
-			const clientId = 'team-client-invalid-capacity';
-			formData.set('clientId', clientId);
+			formData.set('id', crypto.randomUUID());
 
 			const mockEvent = createMockRequest(formData);
 			const result = await actions.createTeam(mockEvent as Parameters<typeof actions.createTeam>[0]);
 
 			expect(result).toHaveProperty('status', 400);
 			expectErrorMessage(result, 'Invalid monthly capacity');
-			if (result && typeof result === 'object' && 'data' in result) {
-				expect((result as { data: { clientId?: string } }).data.clientId).toBe(clientId);
-			}
+		});
+
+		it('should return error when id is missing', async () => {
+			const formData = new FormData();
+			formData.set('name', 'Engineering Team');
+			formData.set('monthlyCapacity', '5.0');
+
+			const mockEvent = createMockRequest(formData);
+			const result = await actions.createTeam(mockEvent as Parameters<typeof actions.createTeam>[0]);
+
+			expect(result).toHaveProperty('status', 400);
+			expectErrorMessage(result, 'Missing team ID');
 		});
 	});
 
 	describe('updateTeam action', () => {
 		it('should update team and persist changes to database', async () => {
-			const team = await createTeam(
-				{
-					name: 'Original Team',
-					monthlyCapacity: 3.0
-				},
-				testDb
-			);
+			const team = await insertTeam({
+				name: 'Original Team',
+				monthlyCapacity: 3.0
+			});
 
 			const formData = new FormData();
 			formData.set('id', team.id);
@@ -668,13 +655,10 @@ describe('Planning Page Routes', () => {
 		});
 
 		it('should update only name when monthlyCapacity is not provided', async () => {
-			const team = await createTeam(
-				{
-					name: 'Original Team',
-					monthlyCapacity: 3.0
-				},
-				testDb
-			);
+			const team = await insertTeam({
+				name: 'Original Team',
+				monthlyCapacity: 3.0
+			});
 
 			const formData = new FormData();
 			formData.set('id', team.id);
@@ -707,21 +691,15 @@ describe('Planning Page Routes', () => {
 
 	describe('deleteTeam action', () => {
 		it('should delete team and unassign work packages', async () => {
-			const team = await createTeam(
-				{
-					name: 'Test Team',
-					monthlyCapacity: 3.0
-				},
-				testDb
-			);
+			const team = await insertTeam({
+				name: 'Test Team',
+				monthlyCapacity: 3.0
+			});
 
-			const wp = await createWorkPackage(
-				{
-					title: 'Test Work Package',
-					sizeInPersonMonths: 2.0,
-				},
-				testDb
-			);
+			const wp = await insertWorkPackage({
+				title: 'Test Work Package',
+				sizeInPersonMonths: 2.0
+			});
 
 			await assignWorkPackage(wp.id, team.id, 0, testDb);
 
@@ -747,13 +725,10 @@ describe('Planning Page Routes', () => {
 		});
 
 		it('should delete team with capacity overrides', async () => {
-			const team = await createTeam(
-				{
-					name: 'Test Team',
-					monthlyCapacity: 3.0
-				},
-				testDb
-			);
+			const team = await insertTeam({
+				name: 'Test Team',
+				monthlyCapacity: 3.0
+			});
 
 			await setCapacityOverride(team.id, '2025-12', 4.5, testDb);
 
@@ -786,13 +761,10 @@ describe('Planning Page Routes', () => {
 
 	describe('updateCapacity action - zero values', () => {
 		it('should accept zero as valid capacity value', async () => {
-			const team = await createTeam(
-				{
-					name: 'Test Team',
-					monthlyCapacity: 3.0
-				},
-				testDb
-			);
+			const team = await insertTeam({
+				name: 'Test Team',
+				monthlyCapacity: 3.0
+			});
 
 			const formData = new FormData();
 			formData.set('teamId', team.id);
@@ -814,13 +786,10 @@ describe('Planning Page Routes', () => {
 		});
 
 		it('should reject negative capacity values', async () => {
-			const team = await createTeam(
-				{
-					name: 'Test Team',
-					monthlyCapacity: 3.0
-				},
-				testDb
-			);
+			const team = await insertTeam({
+				name: 'Test Team',
+				monthlyCapacity: 3.0
+			});
 
 			const formData = new FormData();
 			formData.set('teamId', team.id);
@@ -837,21 +806,15 @@ describe('Planning Page Routes', () => {
 
 	describe('scheduledPosition preservation', () => {
 		it('should preserve scheduledPosition of 0 through load function round-trip', async () => {
-			const team = await createTeam(
-				{
-					name: 'Test Team',
-					monthlyCapacity: 3.0
-				},
-				testDb
-			);
+			const team = await insertTeam({
+				name: 'Test Team',
+				monthlyCapacity: 3.0
+			});
 
-			const wp = await createWorkPackage(
-				{
-					title: 'First Work Package',
-					sizeInPersonMonths: 2.0,
-				},
-				testDb
-			);
+			const wp = await insertWorkPackage({
+				title: 'First Work Package',
+				sizeInPersonMonths: 2.0
+			});
 
 			// Assign work package to team at position 0 (first position)
 			await assignWorkPackage(wp.id, team.id, 0, testDb);
@@ -872,13 +835,10 @@ describe('Planning Page Routes', () => {
 		});
 
 		it('should preserve scheduledPosition of 0 for unassigned work packages', async () => {
-			const wp = await createWorkPackage(
-				{
-					title: 'Unassigned Work Package',
-					sizeInPersonMonths: 2.0,
-				},
-				testDb
-			);
+			const wp = await insertWorkPackage({
+				title: 'Unassigned Work Package',
+				sizeInPersonMonths: 2.0
+			});
 
 			// Manually set scheduledPosition to 0 for unassigned work package
 			// This simulates a work package that was previously assigned and then unassigned
@@ -906,13 +866,10 @@ describe('Planning Page Routes', () => {
 		});
 
 		it('should convert null scheduledPosition to undefined', async () => {
-			const wp = await createWorkPackage(
-				{
-					title: 'Work Package with null position',
-					sizeInPersonMonths: 2.0,
-				},
-				testDb
-			);
+			const wp = await insertWorkPackage({
+				title: 'Work Package with null position',
+				sizeInPersonMonths: 2.0
+			});
 
 			// Work packages created without assignment have null scheduledPosition by default
 
@@ -933,13 +890,10 @@ describe('Planning Page Routes', () => {
 
 	describe('priority behavior', () => {
 		it('should not change priority when editing work package', async () => {
-			const wp = await createWorkPackage(
-				{
-					title: 'Original Title',
-					sizeInPersonMonths: 2.0
-				},
-				testDb
-			);
+			const wp = await insertWorkPackage({
+				title: 'Original Title',
+				sizeInPersonMonths: 2.0
+			});
 
 			// Get the original priority
 			const loadResult = await load({} as Parameters<typeof load>[0]);
