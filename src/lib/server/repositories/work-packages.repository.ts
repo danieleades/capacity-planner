@@ -74,7 +74,7 @@ export async function updateWorkPackage(
 				return;
 			}
 
-			await db.update(workPackages).set(withUpdatedTimestamp(validated)).where(eq(workPackages.id, id));
+			db.update(workPackages).set(withUpdatedTimestamp(validated)).where(eq(workPackages.id, id)).run();
 		} catch (error) {
 			handleValidationError(error, 'update work package');
 		}
@@ -88,7 +88,7 @@ export async function updateWorkPackage(
  */
 export async function deleteWorkPackage(id: string, db: DbParam = defaultDb): Promise<void> {
 	return dbOperation(async () => {
-		await db.delete(workPackages).where(eq(workPackages.id, id));
+		db.delete(workPackages).where(eq(workPackages.id, id)).run();
 	}, 'Failed to delete work package');
 }
 
@@ -106,15 +106,15 @@ export async function assignWorkPackage(
 	db: DbParam = defaultDb
 ): Promise<void> {
 	return dbOperation(async () => {
-		await db
-			.update(workPackages)
+		db.update(workPackages)
 			.set(
 				withUpdatedTimestamp({
 					assignedTeamId: teamId,
 					scheduledPosition: position
 				})
 			)
-			.where(eq(workPackages.id, workPackageId));
+			.where(eq(workPackages.id, workPackageId))
+			.run();
 	}, 'Failed to assign work package');
 }
 
@@ -128,15 +128,15 @@ export async function unassignWorkPackage(
 	db: DbParam = defaultDb
 ): Promise<void> {
 	return dbOperation(async () => {
-		await db
-			.update(workPackages)
+		db.update(workPackages)
 			.set(
 				withUpdatedTimestamp({
 					assignedTeamId: null,
 					scheduledPosition: null
 				})
 			)
-			.where(eq(workPackages.id, workPackageId));
+			.where(eq(workPackages.id, workPackageId))
+			.run();
 	}, 'Failed to unassign work package');
 }
 

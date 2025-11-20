@@ -27,7 +27,7 @@ export async function createTeam(
 			const validated = teamValidation.create.parse(input);
 			const teamData = withTimestamps(validated);
 
-			await db.insert(teams).values(teamData);
+			db.insert(teams).values(teamData).run();
 
 			return { id: teamData.id };
 		} catch (error) {
@@ -55,7 +55,7 @@ export async function updateTeam(
 				return;
 			}
 
-			await db.update(teams).set(withUpdatedTimestamp(validated)).where(eq(teams.id, id));
+			db.update(teams).set(withUpdatedTimestamp(validated)).where(eq(teams.id, id)).run();
 		} catch (error) {
 			handleValidationError(error, 'update team');
 		}
@@ -73,18 +73,18 @@ export async function deleteTeam(id: string, db: DbParam = defaultDb): Promise<v
 	return dbOperation(async () => {
 		// First, unassign all work packages from this team
 		// This ensures both assignedTeamId and scheduledPosition are set to null
-		await db
-			.update(workPackages)
+		db.update(workPackages)
 			.set(
 				withUpdatedTimestamp({
 					assignedTeamId: null,
 					scheduledPosition: null
 				})
 			)
-			.where(eq(workPackages.assignedTeamId, id));
+			.where(eq(workPackages.assignedTeamId, id))
+			.run();
 
 		// Then delete the team (cascade will handle capacity overrides)
-		await db.delete(teams).where(eq(teams.id, id));
+		db.delete(teams).where(eq(teams.id, id)).run();
 	}, 'Failed to delete team');
 }
 
@@ -123,18 +123,18 @@ export async function setCapacityOverride(
 				.limit(1);
 
 			if (existing.length > 0) {
-				await db
-					.update(capacityOverrides)
+				db.update(capacityOverrides)
 					.set(withUpdatedTimestamp({ capacity: validated.capacity }))
 					.where(
 						and(
 							eq(capacityOverrides.teamId, validated.teamId),
 							eq(capacityOverrides.yearMonth, validated.yearMonth)
 						)
-					);
+					)
+					.run();
 			} else {
 				const overrideData = withTimestamps(validated);
-				await db.insert(capacityOverrides).values(overrideData);
+				db.insert(capacityOverrides).values(overrideData).run();
 			}
 		} catch (error) {
 			handleValidationError(error, 'set capacity override');
@@ -154,10 +154,10 @@ export async function removeCapacityOverride(
 	db: DbParam = defaultDb
 ): Promise<void> {
 	return dbOperation(async () => {
-		await db
-			.delete(capacityOverrides)
+		db.delete(capacityOverrides)
 			.where(
 				and(eq(capacityOverrides.teamId, teamId), eq(capacityOverrides.yearMonth, yearMonth))
-			);
+			)
+			.run();
 	}, 'Failed to remove capacity override');
 }
