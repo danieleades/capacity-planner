@@ -1,38 +1,24 @@
-# sv
+# Capacity planning
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+SvelteKit app for interactive capacity planning.
 
-## Creating a project
-
-If you're seeing this, you've probably already done this step. Congrats!
+## Setup
 
 ```sh
-# create a new project in the current directory
-npx sv create
-
-# create a new project in my-app
-npx sv create my-app
+npm install
 ```
 
-## Developing
+## Scripts
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+- `npm run dev` – start the dev server
+- `npm run build` – build for production
+- `npm run preview` – preview the built app
+- `npm run lint` – run ESLint
+- `npm run check` – type and Svelte checks
+- `npm run test` – run the test suite
+- `npm run test:coverage` – run tests with coverage
 
-```sh
-npm run dev
+## CI & coverage
 
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
-
-## Building
-
-To create a production version of your app:
-
-```sh
-npm run build
-```
-
-You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+GitHub Actions run linting, type checking, and tests on pushes and pull requests.  
+Test coverage is collected with Vitest and uploaded to Codecov from the CI test job (requires `CODECOV_TOKEN` secret for private repos).
