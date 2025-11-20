@@ -44,8 +44,8 @@
 		class="inline-block"
 		aria-label="Capacity over next {monthCount} months"
 	>
-		{#each capacityData as data (data.yearMonth)}
-			{@const x = capacityData.indexOf(data) * barWidth}
+		{#each capacityData as data, i (data.yearMonth)}
+			{@const x = i * barWidth}
 			{@const barHeight = maxCapacity > 0 ? (data.capacity / maxCapacity) * (height - 4) : 0}
 			{@const y = height - barHeight - 2}
 

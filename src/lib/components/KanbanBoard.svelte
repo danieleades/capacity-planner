@@ -1,54 +1,43 @@
 <script lang="ts">
+	import { getContext } from 'svelte';
+	import type { Readable } from 'svelte/store';
 	import { dndzone } from 'svelte-dnd-action';
-	import { appState, teams } from '$lib/stores/appState';
+	import { createAppStore } from '$lib/stores/appState';
 	import {
 		calculateTeamBacklog,
 		formatMonths,
 		formatDate,
 		type TeamBacklogMetrics,
 	} from '$lib/utils/capacity';
-	import type { WorkPackage, Team } from '$lib/types';
-	import Modal from './Modal.svelte';
+	import type { WorkPackage, Team, PlanningPageData } from '$lib/types';
+	import type { OptimisticEnhanceAction } from '$lib/types/optimistic';
 	import CapacitySparkline from './CapacitySparkline.svelte';
-	import WorkPackageForm from './WorkPackageForm.svelte';
+	import WorkPackageModal from './WorkPackageModal.svelte';
+
+	interface Props {
+		optimisticEnhance: OptimisticEnhanceAction<PlanningPageData>;
+	}
+
+	let { optimisticEnhance }: Props = $props();
+
+	// Get stores from context
+	const appState = getContext<ReturnType<typeof createAppStore>>('appState');
+	const teams = getContext<Readable<Team[]>>('teams');
 
 	const flipDurationMs = 200;
 
-	// Work package form state
+	// Modal state
 	let showAddModal = $state(false);
-	let editingWorkPackage = $state<string | null>(null);
-	let formTitle = $state('');
-	let formSize = $state(0);
-	let formDescription = $state('');
+	let editingWorkPackage = $state<WorkPackage | undefined>(undefined);
 
 	function openAddModal() {
-		formTitle = '';
-		formSize = 0;
-		formDescription = '';
-		editingWorkPackage = null;
+		editingWorkPackage = undefined;
 		showAddModal = true;
 	}
 
 	function closeModal() {
 		showAddModal = false;
-		editingWorkPackage = null;
-		formTitle = '';
-		formSize = 0;
-		formDescription = '';
-	}
-
-	function handleSubmit(title: string, size: number, description?: string) {
-		if (editingWorkPackage) {
-			appState.updateWorkPackage(editingWorkPackage, {
-				title,
-				sizeInPersonMonths: size,
-				description,
-			});
-		} else {
-			appState.addWorkPackage(title, size, description);
-		}
-
-		closeModal();
+		editingWorkPackage = undefined;
 	}
 
 	interface Column {
@@ -65,7 +54,10 @@
 
 	// Helper function to build columns from store data
 	// Sort by scheduledPosition (for board planning) with fallback to priority
-	// Optimized to pre-group work packages once instead of filtering per team
+	// 
+	// Performance optimization: Pre-groups work packages by team in O(n) time,
+	// then passes pre-filtered arrays to calculateTeamBacklog to avoid redundant
+	// O(n) filtering per team. This reduces complexity from O(teams × packages) to O(packages).
 	function buildColumns(): Column[] {
 		const sortByScheduledPosition = (items: WorkPackage[]) =>
 			items.sort((a, b) => {
@@ -96,7 +88,9 @@
 
 		for (const team of $teams) {
 			const teamWPs = workPackagesByTeam.get(team.id) || [];
-			const metrics = calculateTeamBacklog(team, $appState.workPackages);
+			// Pass preFiltered=true since teamWPs is already filtered for this team
+			// This avoids redundant O(n) filtering inside calculateTeamBacklog
+			const metrics = calculateTeamBacklog(team, teamWPs, true);
 
 			cols.push({
 				id: team.id,
@@ -137,9 +131,19 @@
 		});
 	}
 
+	/**
+	 * Handle drag-and-drop finalize event
+	 * 
+	 * Note: svelte-dnd-action fires finalize on BOTH the origin and target zones when an item
+	 * is dragged. When the last item is dragged out of a column, the origin zone receives a
+	 * finalize event with an empty items array. We must skip the server request in this case
+	 * because the server validation explicitly rejects empty update arrays (returns 400 error).
+	 * The target zone will handle the actual persistence with the correct data.
+	 */
 	function handleDndFinalize(columnId: string, e: CustomEvent) {
 		const items = e.detail.items as WorkPackage[];
 		const newTeamId = columnId === 'unassigned' ? undefined : columnId;
+
 
 		// Update local state first
 		columns = columns.map((col) => {
@@ -149,48 +153,135 @@
 			return col;
 		});
 
-		// Update both team assignment AND scheduledPosition
-		// scheduledPosition is the board view ordering (persistent, for planning/phasing)
-		// priority remains unchanged (that's the global canonical ordering)
-		const scheduledPositionMap = new Map(items.map((wp, index) => [wp.id, index]));
+		// Collect all updates for the batch request
+		type LocalReorderUpdate = {
+			id: string;
+			teamId: string | null;
+			position: number;
+		};
+		const updates: LocalReorderUpdate[] = items.map((wp, index) => ({
+			id: wp.id,
+			teamId: newTeamId ?? null,
+			position: index,
+			isPending: false
+		}));
+		const persistedUpdates = updates.map((update, index) => ({
+			id: update.id,
+			teamId: update.teamId,
+			position: index
+		}));
 
-		appState.update((state) => {
-			const updatedWorkPackages = state.workPackages.map((wp) => {
-				if (scheduledPositionMap.has(wp.id)) {
-					return {
-						...wp,
-						assignedTeamId: newTeamId,
-						scheduledPosition: scheduledPositionMap.get(wp.id)!,
-					};
-				}
-				return wp;
-			});
+		// Capture snapshot before optimistic update for rollback
+		const snapshot = $appState;
 
-			return {
-				...state,
-				workPackages: updatedWorkPackages,
-			};
-		});
+		// Optimistically update the store using batch operation
+		appState.batchUpdateWorkPackages(updates.map(u => ({
+			id: u.id,
+			assignedTeamId: u.teamId,
+			scheduledPosition: u.position
+		})));
+
+		// Skip server request if there are no persisted updates to send
+		if (persistedUpdates.length === 0) {
+			return;
+		}
+
+		// Submit single batch request to persist all changes
+		submitBatchReorder(persistedUpdates, snapshot);
 	}
 
-	function reorderByPriority() {
-		// Clear scheduledPosition for all unassigned work packages
-		// This makes them fall back to priority ordering
-		appState.update((state) => {
-			const updatedWorkPackages = state.workPackages.map((wp) => {
-				if (!wp.assignedTeamId) {
-					// eslint-disable-next-line @typescript-eslint/no-unused-vars
-					const { scheduledPosition, ...rest } = wp;
-					return rest;
-				}
-				return wp;
+	// Helper function to submit batch reorder to server
+	async function submitBatchReorder(
+		updates: Array<{ id: string; teamId: string | null; position: number }>,
+		snapshot: typeof $appState
+	) {
+		const formData = new FormData();
+		formData.append('updates', JSON.stringify(updates));
+
+		try {
+			const response = await fetch('?/reorderWorkPackages', {
+				method: 'POST',
+				body: formData
 			});
 
-			return {
-				...state,
-				workPackages: updatedWorkPackages,
-			};
-		});
+			const result = await response.json();
+
+			// Check HTTP status code first, then result type
+			if (!response.ok || result.type === 'failure') {
+				const errorMsg = result.data?.details || result.data?.error || 'Failed to reorder work packages';
+				console.error('Failed to reorder work packages:', errorMsg);
+
+				// Rollback to snapshot
+				appState.set(snapshot);
+
+				// Show error message to user with retry functionality
+				const windowWithHandler = window as Window & { handleFormError?: (msg: string, retry?: () => void) => void };
+				if (typeof window !== 'undefined' && windowWithHandler.handleFormError) {
+					windowWithHandler.handleFormError(errorMsg, () => {
+						submitBatchReorder(updates, snapshot);
+					});
+				}
+			}
+		} catch (error) {
+			const errorMsg = error instanceof Error ? error.message : 'Failed to reorder work packages';
+			console.error('Failed to reorder work packages:', errorMsg);
+
+			// Rollback to snapshot
+			appState.set(snapshot);
+
+			// Show error message to user with retry functionality
+			const windowWithHandler = window as Window & { handleFormError?: (msg: string, retry?: () => void) => void };
+			if (typeof window !== 'undefined' && windowWithHandler.handleFormError) {
+				windowWithHandler.handleFormError(errorMsg, () => {
+					submitBatchReorder(updates, snapshot);
+				});
+			}
+		}
+	}
+
+	async function reorderByPriority() {
+		// Capture snapshot before optimistic update for rollback
+		const snapshot = $appState;
+
+		// Optimistically clear scheduledPosition for unassigned work packages
+		appState.clearUnassignedScheduledPositions();
+
+		// Persist to server using dedicated action
+		try {
+			const response = await fetch('?/clearUnassignedPositions', {
+				method: 'POST',
+				body: new FormData()
+			});
+
+			const result = await response.json();
+
+			// Check HTTP status code first, then result type
+			if (!response.ok || result.type === 'failure') {
+				const errorMsg = result.data?.details || result.data?.error || 'Failed to reset to priority order';
+				console.error('Failed to reset to priority order:', errorMsg);
+
+				// Rollback to snapshot
+				appState.set(snapshot);
+
+				// Show error message to user with retry functionality
+				const windowWithHandler = window as Window & { handleFormError?: (msg: string, retry?: () => void) => void };
+				if (typeof window !== 'undefined' && windowWithHandler.handleFormError) {
+					windowWithHandler.handleFormError(errorMsg, reorderByPriority);
+				}
+			}
+		} catch (error) {
+			const errorMsg = error instanceof Error ? error.message : 'Failed to reset to priority order';
+			console.error('Failed to reset to priority order:', errorMsg);
+
+			// Rollback to snapshot
+			appState.set(snapshot);
+
+			// Show error message to user with retry functionality
+			const windowWithHandler = window as Window & { handleFormError?: (msg: string, retry?: () => void) => void };
+			if (typeof window !== 'undefined' && windowWithHandler.handleFormError) {
+				windowWithHandler.handleFormError(errorMsg, reorderByPriority);
+			}
+		}
 	}
 </script>
 
@@ -292,17 +383,9 @@
 	</div>
 </div>
 
-<Modal
+<WorkPackageModal
+	{optimisticEnhance}
 	bind:open={showAddModal}
-	title={editingWorkPackage ? 'Edit Work Package' : 'Add Work Package'}
+	editingWorkPackage={editingWorkPackage}
 	onClose={closeModal}
->
-	<WorkPackageForm
-		bind:title={formTitle}
-		bind:size={formSize}
-		bind:description={formDescription}
-		isEditing={!!editingWorkPackage}
-		onSubmit={handleSubmit}
-		onCancel={closeModal}
-	/>
-</Modal>
+/>

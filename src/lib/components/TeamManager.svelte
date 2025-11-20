@@ -1,56 +1,99 @@
 <script lang="ts">
-	import { appState, teams } from '$lib/stores/appState';
-	import Modal from './Modal.svelte';
-	import CapacitySparkline from './CapacitySparkline.svelte';
-	import { getNextMonths, formatYearMonth } from '$lib/utils/dates';
+import { getContext } from 'svelte';
+import type { Readable } from 'svelte/store';
+import { createAppStore } from '$lib/stores/appState';
+import type { OptimisticEnhanceAction } from '$lib/types/optimistic';
+import type { Team, PlanningPageData } from '$lib/types';
+import Modal from './Modal.svelte';
+import FormError from './FormError.svelte';
+import CapacitySparkline from './CapacitySparkline.svelte';
+import { getNextMonths, formatYearMonth } from '$lib/utils/dates';
+	import { generateId } from '$lib/utils/id';
+
+	interface Props {
+		optimisticEnhance: OptimisticEnhanceAction<PlanningPageData>;
+	}
+
+	let { optimisticEnhance }: Props = $props();
+
+// Get stores from context
+const appState = getContext<ReturnType<typeof createAppStore>>('appState');
+const teams = getContext<Readable<Team[]>>('teams');
 
 	let showAddModal = $state(false);
 	let editingTeam = $state<string | null>(null);
 	let formName = $state('');
 	let formCapacity = $state(0);
+	let nameError = $state<string | null>(null);
+	let capacityError = $state<string | null>(null);
+	let teamFormRef = $state<HTMLFormElement | null>(null);
+let newTeamId = $state<string>(generateId());
 
-	function openAddModal() {
-		formName = '';
-		formCapacity = 0;
-		editingTeam = null;
-		showAddModal = true;
+function openAddModal() {
+	formName = '';
+	formCapacity = 0;
+	editingTeam = null;
+	nameError = null;
+	capacityError = null;
+	newTeamId = generateId();
+	showAddModal = true;
+}
+
+function openEditModal(teamId: string) {
+	const team = $teams.find((t) => t.id === teamId);
+	if (!team) {
+		return;
 	}
 
-	function openEditModal(teamId: string) {
-		const team = $teams.find((t) => t.id === teamId);
-		if (team) {
-			formName = team.name;
-			formCapacity = team.monthlyCapacityInPersonMonths;
-			editingTeam = teamId;
-			showAddModal = true;
-		}
+	formName = team.name;
+	formCapacity = team.monthlyCapacityInPersonMonths;
+	editingTeam = teamId;
+	nameError = null;
+	capacityError = null;
+		showAddModal = true;
 	}
 
 	function closeModal() {
 		showAddModal = false;
-		editingTeam = null;
-		formName = '';
-		formCapacity = 0;
+	editingTeam = null;
+	formName = '';
+	formCapacity = 0;
+	nameError = null;
+	capacityError = null;
+	newTeamId = generateId();
 	}
 
-	function handleSubmit() {
-		if (!formName.trim() || formCapacity <= 0) return;
+	function validateForm(): boolean {
+		nameError = null;
+		capacityError = null;
 
-		if (editingTeam) {
-			appState.updateTeam(editingTeam, {
-				name: formName.trim(),
-				monthlyCapacityInPersonMonths: formCapacity,
-			});
-		} else {
-			appState.addTeam(formName.trim(), formCapacity);
+		let isValid = true;
+
+		if (!formName.trim()) {
+			nameError = 'Team name is required';
+			isValid = false;
+		} else if (formName.trim().length > 100) {
+			nameError = 'Team name must be 100 characters or less';
+			isValid = false;
 		}
 
-		closeModal();
+		if (isNaN(formCapacity)) {
+			capacityError = 'Capacity must be a valid number';
+			isValid = false;
+		} else if (formCapacity <= 0) {
+			capacityError = 'Capacity must be greater than 0';
+			isValid = false;
+		}
+
+		return isValid;
 	}
 
-	function handleDelete(teamId: string) {
+function handleDelete(team: Team) {
 		if (confirm('Are you sure you want to delete this team? Work packages will be unassigned.')) {
-			appState.deleteTeam(teamId);
+			const form = document.getElementById(`delete-form-${team.id}`) as HTMLFormElement;
+			if (form) {
+				form.requestSubmit();
+			}
 		}
 	}
 </script>
@@ -72,6 +115,26 @@
 		<div class="space-y-4">
 			{#each $teams as team (team.id)}
 				<div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+					<!-- Hidden delete form -->
+					<form
+						id="delete-form-{team.id}"
+						method="POST"
+						action="?/deleteTeam"
+						data-client-action="delete-team"
+						use:optimisticEnhance={(data, input) => {
+							// Capture snapshot before optimistic delete for rollback
+							const teamId = input.formData.get('id') as string;
+							const snapshots = getContext<Map<string, unknown>>('rollbackSnapshots');
+							snapshots.set('delete-team-' + teamId, $appState);
+
+							// Use store operation to delete team
+							appState.deleteTeam(teamId);
+						}}
+						style="display: none;"
+					>
+						<input type="hidden" name="id" value={team.id} />
+					</form>
+					
 					<!-- Team Header -->
 					<div class="mb-4 flex items-center justify-between">
 						<div class="flex items-center gap-4">
@@ -97,7 +160,7 @@
 								</svg>
 							</button>
 							<button
-								onclick={() => handleDelete(team.id)}
+								onclick={() => handleDelete(team)}
 								class="text-red-600 hover:text-red-800"
 								aria-label="Delete team"
 							>
@@ -124,23 +187,47 @@
 									<label for="capacity-{team.id}-{yearMonth}" class="block text-xs font-medium text-gray-600">
 										{formatYearMonth(yearMonth)}
 									</label>
-									<input
-										id="capacity-{team.id}-{yearMonth}"
-										type="number"
-										step="0.1"
-										min="0"
-										value={capacity}
-										onchange={(e) => {
-											const newCapacity = e.currentTarget.valueAsNumber;
-											if (isNaN(newCapacity) || newCapacity < 0) return;
-											if (newCapacity !== team.monthlyCapacityInPersonMonths) {
-												appState.setMonthlyCapacity(team.id, yearMonth, newCapacity);
-											} else {
-												appState.clearMonthlyCapacity(team.id, yearMonth);
+									<form 
+										method="POST" 
+										action="?/updateCapacity"
+										data-client-action="update-capacity"
+										use:optimisticEnhance={(data, input) => {
+											// Optimistically update the capacity override
+											const teamId = input.formData.get('teamId') as string;
+											const yearMonth = input.formData.get('yearMonth') as string;
+											const newCapacity = parseFloat(input.formData.get('capacity') as string);
+
+											// Skip optimistic update if the parsed value is invalid
+											// This prevents NaN from being injected into the store
+											if (isNaN(newCapacity)) {
+												return;
 											}
+
+											// Capture snapshot before optimistic update for rollback
+											const snapshots = getContext<Map<string, unknown>>('rollbackSnapshots');
+											const snapshotKey = `update-capacity-${teamId}-${yearMonth}`;
+											snapshots.set(snapshotKey, $appState);
+
+											// Use store operation (auto-removes override if it matches default)
+											appState.setMonthlyCapacity(teamId, yearMonth, newCapacity);
 										}}
-										class="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-									/>
+									>
+										<input type="hidden" name="teamId" value={team.id} />
+										<input type="hidden" name="yearMonth" value={yearMonth} />
+										<input
+											id="capacity-{team.id}-{yearMonth}"
+											name="capacity"
+											type="number"
+											step="0.1"
+											min="0"
+											value={capacity}
+											onchange={(e) => {
+												// Submit the form (optimistic update will happen automatically)
+												e.currentTarget.form?.requestSubmit();
+											}}
+											class="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+										/>
+									</form>
 								</div>
 							{/each}
 						</div>
@@ -153,23 +240,61 @@
 
 <Modal bind:open={showAddModal} title={editingTeam ? 'Edit Team' : 'Add Team'} onClose={closeModal}>
 	<form
-		onsubmit={(e) => {
-			e.preventDefault();
-			handleSubmit();
+		bind:this={teamFormRef}
+		method="POST"
+		action={editingTeam ? '?/updateTeam' : '?/createTeam'}
+		use:optimisticEnhance={(data, input) => {
+			const name = input.formData.get('name') as string;
+			const monthlyCapacity = parseFloat(input.formData.get('monthlyCapacity') as string);
+
+			if (editingTeam) {
+				// Use store operation to update team
+				appState.updateTeam(editingTeam, { name, monthlyCapacityInPersonMonths: monthlyCapacity });
+				return;
+			}
+
+			const generatedIdRaw = input.formData.get('id');
+			if (typeof generatedIdRaw !== 'string' || generatedIdRaw.length === 0) {
+				return;
+			}
+
+			// Use store operation to add team
+			appState.addTeam(name, monthlyCapacity, generatedIdRaw);
+		}}
+		onsubmit={(e: SubmitEvent) => {
+			// Validate form before allowing submission
+			if (!validateForm()) {
+				e.preventDefault();
+				return;
+			}
+
+			// Close modal after successful validation
+			// Form will submit naturally with optimisticEnhance
+			closeModal();
 		}}
 	>
+		{#if editingTeam}
+			<input type="hidden" name="id" value={editingTeam} />
+		{:else}
+			<input type="hidden" name="id" value={newTeamId} />
+		{/if}
+		
 		<div class="mb-4">
 			<label for="team-name" class="mb-1 block text-sm font-medium text-gray-700">
 				Team Name
 			</label>
 			<input
 				id="team-name"
+				name="name"
 				type="text"
 				bind:value={formName}
-				class="w-full rounded border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+				class="w-full rounded border px-3 py-2 focus:outline-none focus:ring-1 {nameError
+					? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+					: 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'}"
 				placeholder="e.g., Platform Team"
 				required
 			/>
+			<FormError error={nameError} />
 		</div>
 
 		<div class="mb-6">
@@ -178,18 +303,22 @@
 			</label>
 			<input
 				id="team-capacity"
+				name="monthlyCapacity"
 				type="number"
 				step="0.1"
 				min="0.1"
 				bind:value={formCapacity}
 				oninput={(e) => {
-					const val = e.currentTarget.valueAsNumber;
-					if (!isNaN(val)) formCapacity = val;
+					const target = e.currentTarget as HTMLInputElement;
+					formCapacity = target.valueAsNumber;
 				}}
-				class="w-full rounded border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+				class="w-full rounded border px-3 py-2 focus:outline-none focus:ring-1 {capacityError
+					? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+					: 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'}"
 				placeholder="e.g., 2.5"
 				required
 			/>
+			<FormError error={capacityError} />
 			<p class="mt-1 text-xs text-gray-500">
 				How many person-months of work can this team complete per month?
 			</p>

@@ -8,6 +8,7 @@ export function createMockTeam(overrides?: Partial<Team>): Team {
 		id: crypto.randomUUID(),
 		name: 'Test Team',
 		monthlyCapacityInPersonMonths: 2.0,
+		capacityOverrides: [],
 		...overrides,
 	};
 }

@@ -1,58 +1,52 @@
 <script lang="ts">
-	import { appState, workPackages } from '$lib/stores/appState';
-	import Modal from './Modal.svelte';
-	import WorkPackageForm from './WorkPackageForm.svelte';
+	import { getContext } from 'svelte';
+	import type { Readable } from 'svelte/store';
+	import { createAppStore } from '$lib/stores/appState';
+	import type { WorkPackage, PlanningPageData } from '$lib/types';
+	import type { OptimisticEnhanceAction } from '$lib/types/optimistic';
+	import WorkPackageModal from './WorkPackageModal.svelte';
 
+	interface Props {
+		optimisticEnhance: OptimisticEnhanceAction<PlanningPageData>;
+	}
+
+	let { optimisticEnhance }: Props = $props();
+
+	// Get stores from context
+	const appState = getContext<ReturnType<typeof createAppStore>>('appState');
+	const workPackages = getContext<Readable<WorkPackage[]>>('workPackages');
+
+	// Modal state
 	let showAddModal = $state(false);
-	let editingWorkPackage = $state<string | null>(null);
-	let formTitle = $state('');
-	let formSize = $state(0);
-	let formDescription = $state('');
+	let editingWorkPackage = $state<WorkPackage | undefined>(undefined);
+	let deleteFormRefs: Record<string, HTMLFormElement | null> = {};
 
 	function openAddModal() {
-		formTitle = '';
-		formSize = 0;
-		formDescription = '';
-		editingWorkPackage = null;
+		editingWorkPackage = undefined;
 		showAddModal = true;
 	}
 
-	function openEditModal(workPackageId: string) {
+function openEditModal(workPackageId: string) {
 		const wp = $workPackages.find((w) => w.id === workPackageId);
-		if (wp) {
-			formTitle = wp.title;
-			formSize = wp.sizeInPersonMonths;
-			formDescription = wp.description || '';
-			editingWorkPackage = workPackageId;
-			showAddModal = true;
+		if (!wp) {
+			return;
 		}
+
+		editingWorkPackage = wp;
+		showAddModal = true;
 	}
 
 	function closeModal() {
 		showAddModal = false;
-		editingWorkPackage = null;
-		formTitle = '';
-		formSize = 0;
-		formDescription = '';
+		editingWorkPackage = undefined;
 	}
 
-	function handleSubmit(title: string, size: number, description?: string) {
-		if (editingWorkPackage) {
-			appState.updateWorkPackage(editingWorkPackage, {
-				title,
-				sizeInPersonMonths: size,
-				description,
-			});
-		} else {
-			appState.addWorkPackage(title, size, description);
-		}
-
-		closeModal();
-	}
-
-	function handleDelete(workPackageId: string) {
+function handleDelete(workPackage: WorkPackage) {
 		if (confirm('Are you sure you want to delete this work package?')) {
-			appState.deleteWorkPackage(workPackageId);
+			const form = deleteFormRefs[workPackage.id];
+			if (form) {
+				form.requestSubmit();
+			}
 		}
 	}
 </script>
@@ -71,6 +65,28 @@
 	{#if $workPackages.length === 0}
 		<p class="text-gray-500">No work packages yet. Add one to get started.</p>
 	{:else}
+		<!-- Hidden delete forms for each work package -->
+		{#each $workPackages as wp (wp.id)}
+			<form
+				bind:this={deleteFormRefs[wp.id]}
+				method="POST"
+				action="?/deleteWorkPackage"
+				data-client-action="delete-work-package"
+				use:optimisticEnhance={(data, input) => {
+					// Capture snapshot before optimistic delete for rollback
+					const workPackageId = input.formData.get('id') as string;
+					const snapshots = getContext<Map<string, unknown>>('rollbackSnapshots');
+					snapshots.set('delete-work-package-' + workPackageId, $appState);
+
+					// Use store operation to delete work package
+					appState.deleteWorkPackage(workPackageId);
+				}}
+				style="display: none;"
+			>
+				<input type="hidden" name="id" value={wp.id} />
+			</form>
+		{/each}
+		
 		<div class="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
 			<table class="w-full">
 				<thead class="border-b border-gray-200 bg-gray-50">
@@ -84,9 +100,9 @@
 					</tr>
 				</thead>
 				<tbody>
-					{#each $workPackages as wp, index (wp.id)}
+					{#each $workPackages as wp (wp.id)}
 						<tr class="border-b border-gray-100 hover:bg-gray-50">
-							<td class="px-4 py-3 text-sm text-gray-900">{index + 1}</td>
+							<td class="px-4 py-3 text-sm text-gray-900">{wp.priority + 1}</td>
 							<td class="px-4 py-3 text-sm font-medium text-gray-900">{wp.title}</td>
 							<td class="px-4 py-3 text-sm text-gray-900">{wp.sizeInPersonMonths}</td>
 							<td class="px-4 py-3 text-sm text-gray-600">
@@ -119,7 +135,7 @@
 										</svg>
 									</button>
 									<button
-										onclick={() => handleDelete(wp.id)}
+										onclick={() => handleDelete(wp)}
 										class="text-red-600 hover:text-red-800"
 										aria-label="Delete work package"
 									>
@@ -142,17 +158,9 @@
 	{/if}
 </div>
 
-<Modal
+<WorkPackageModal
+	{optimisticEnhance}
 	bind:open={showAddModal}
-	title={editingWorkPackage ? 'Edit Work Package' : 'Add Work Package'}
+	editingWorkPackage={editingWorkPackage}
 	onClose={closeModal}
->
-	<WorkPackageForm
-		bind:title={formTitle}
-		bind:size={formSize}
-		bind:description={formDescription}
-		isEditing={!!editingWorkPackage}
-		onSubmit={handleSubmit}
-		onCancel={closeModal}
-	/>
-</Modal>
+/>
