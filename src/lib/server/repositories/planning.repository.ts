@@ -99,8 +99,18 @@ export function getPlanningView(db: DbParam = defaultDb): PlanningView {
 			});
 		}
 
-		// Sort unassigned work packages by priority
-		unassignedWorkPackages.sort((a, b) => a.priority - b.priority);
+		// Sort unassigned work packages by scheduledPosition (if set), otherwise by priority
+		unassignedWorkPackages.sort((a, b) => {
+			// Both have scheduled positions - use those
+			if (a.scheduledPosition !== null && b.scheduledPosition !== null) {
+				return a.scheduledPosition - b.scheduledPosition;
+			}
+			// One has scheduled position - it comes first
+			if (a.scheduledPosition !== null) return -1;
+			if (b.scheduledPosition !== null) return 1;
+			// Neither has scheduled position - fall back to priority
+			return a.priority - b.priority;
+		});
 
 		// Transform teams into domain models
 		const teamModels: Team[] = allTeams.map((team) => ({
