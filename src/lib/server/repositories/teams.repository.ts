@@ -111,7 +111,7 @@ export async function setCapacityOverride(
 				capacity
 			});
 
-			const existing = await db
+			const existing = db
 				.select()
 				.from(capacityOverrides)
 				.where(
@@ -120,9 +120,9 @@ export async function setCapacityOverride(
 						eq(capacityOverrides.yearMonth, validated.yearMonth)
 					)
 				)
-				.limit(1);
+				.get();
 
-			if (existing.length > 0) {
+			if (existing) {
 				db.update(capacityOverrides)
 					.set(withUpdatedTimestamp({ capacity: validated.capacity }))
 					.where(
