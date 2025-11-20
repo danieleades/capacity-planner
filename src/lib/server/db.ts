@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
+import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { dev } from '$app/environment';
 
 /**
@@ -34,7 +35,19 @@ sqlite.pragma('journal_mode = WAL');
 sqlite.pragma('foreign_keys = ON');
 
 // Create Drizzle ORM instance
-export const db = drizzle(sqlite);
+const db = drizzle(sqlite);
+
+// Run migrations automatically on startup to ensure schema exists
+// This eliminates the need to manually run `npm run migrate` before first use
+try {
+	migrate(db, { migrationsFolder: './drizzle' });
+	console.log('✅ Database migrations completed');
+} catch (error) {
+	console.error('❌ Database migration failed:', error);
+	throw error;
+}
+
+export { db };
 
 // Export the raw SQLite instance for direct access if needed
 export { sqlite };

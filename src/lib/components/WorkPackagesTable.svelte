@@ -71,9 +71,12 @@ function handleDelete(workPackage: WorkPackage) {
 				bind:this={deleteFormRefs[wp.id]}
 				method="POST"
 				action="?/deleteWorkPackage"
+				data-client-action="delete-work-package"
 				use:optimisticEnhance={(data, input) => {
-					// Optimistically remove the work package
+					// Capture snapshot before optimistic delete for rollback
 					const workPackageId = input.formData.get('id') as string;
+					const snapshots = getContext<Map<string, unknown>>('rollbackSnapshots');
+					snapshots.set('delete-work-package-' + workPackageId, $appState);
 
 					// Use store operation to delete work package
 					appState.deleteWorkPackage(workPackageId);

@@ -120,9 +120,12 @@ function handleDelete(team: Team) {
 						id="delete-form-{team.id}"
 						method="POST"
 						action="?/deleteTeam"
+						data-client-action="delete-team"
 						use:optimisticEnhance={(data, input) => {
-							// Optimistically remove the team
+							// Capture snapshot before optimistic delete for rollback
 							const teamId = input.formData.get('id') as string;
+							const snapshots = getContext<Map<string, unknown>>('rollbackSnapshots');
+							snapshots.set('delete-team-' + teamId, $appState);
 
 							// Use store operation to delete team
 							appState.deleteTeam(teamId);
@@ -186,12 +189,24 @@ function handleDelete(team: Team) {
 									</label>
 									<form 
 										method="POST" 
-										action="?/updateCapacity" 
+										action="?/updateCapacity"
+										data-client-action="update-capacity"
 										use:optimisticEnhance={(data, input) => {
 											// Optimistically update the capacity override
 											const teamId = input.formData.get('teamId') as string;
 											const yearMonth = input.formData.get('yearMonth') as string;
 											const newCapacity = parseFloat(input.formData.get('capacity') as string);
+
+											// Skip optimistic update if the parsed value is invalid
+											// This prevents NaN from being injected into the store
+											if (isNaN(newCapacity)) {
+												return;
+											}
+
+											// Capture snapshot before optimistic update for rollback
+											const snapshots = getContext<Map<string, unknown>>('rollbackSnapshots');
+											const snapshotKey = `update-capacity-${teamId}-${yearMonth}`;
+											snapshots.set(snapshotKey, $appState);
 
 											// Use store operation (auto-removes override if it matches default)
 											appState.setMonthlyCapacity(teamId, yearMonth, newCapacity);

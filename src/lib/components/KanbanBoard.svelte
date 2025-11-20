@@ -171,6 +171,9 @@
 			position: index
 		}));
 
+		// Capture snapshot before optimistic update for rollback
+		const snapshot = $appState;
+
 		// Optimistically update the store using batch operation
 		appState.batchUpdateWorkPackages(updates.map(u => ({
 			id: u.id,
@@ -184,11 +187,14 @@
 		}
 
 		// Submit single batch request to persist all changes
-		submitBatchReorder(persistedUpdates);
+		submitBatchReorder(persistedUpdates, snapshot);
 	}
 
 	// Helper function to submit batch reorder to server
-	async function submitBatchReorder(updates: Array<{ id: string; teamId: string | null; position: number }>) {
+	async function submitBatchReorder(
+		updates: Array<{ id: string; teamId: string | null; position: number }>,
+		snapshot: typeof $appState
+	) {
 		const formData = new FormData();
 		formData.append('updates', JSON.stringify(updates));
 
@@ -205,35 +211,38 @@
 				const errorMsg = result.data?.details || result.data?.error || 'Failed to reorder work packages';
 				console.error('Failed to reorder work packages:', errorMsg);
 
+				// Rollback to snapshot
+				appState.set(snapshot);
+
 				// Show error message to user with retry functionality
 				const windowWithHandler = window as Window & { handleFormError?: (msg: string, retry?: () => void) => void };
 				if (typeof window !== 'undefined' && windowWithHandler.handleFormError) {
 					windowWithHandler.handleFormError(errorMsg, () => {
-						submitBatchReorder(updates);
+						submitBatchReorder(updates, snapshot);
 					});
-				} else {
-					// Fallback: reload to revert optimistic update
-					window.location.reload();
 				}
 			}
 		} catch (error) {
 			const errorMsg = error instanceof Error ? error.message : 'Failed to reorder work packages';
 			console.error('Failed to reorder work packages:', errorMsg);
-			
+
+			// Rollback to snapshot
+			appState.set(snapshot);
+
 			// Show error message to user with retry functionality
 			const windowWithHandler = window as Window & { handleFormError?: (msg: string, retry?: () => void) => void };
 			if (typeof window !== 'undefined' && windowWithHandler.handleFormError) {
 				windowWithHandler.handleFormError(errorMsg, () => {
-					submitBatchReorder(updates);
+					submitBatchReorder(updates, snapshot);
 				});
-			} else {
-				// Fallback: reload to revert optimistic update
-				window.location.reload();
 			}
 		}
 	}
 
 	async function reorderByPriority() {
+		// Capture snapshot before optimistic update for rollback
+		const snapshot = $appState;
+
 		// Optimistically clear scheduledPosition for unassigned work packages
 		appState.clearUnassignedScheduledPositions();
 
@@ -251,23 +260,26 @@
 				const errorMsg = result.data?.details || result.data?.error || 'Failed to reset to priority order';
 				console.error('Failed to reset to priority order:', errorMsg);
 
-				// Show error and reload to revert optimistic update
+				// Rollback to snapshot
+				appState.set(snapshot);
+
+				// Show error message to user with retry functionality
 				const windowWithHandler = window as Window & { handleFormError?: (msg: string, retry?: () => void) => void };
 				if (typeof window !== 'undefined' && windowWithHandler.handleFormError) {
 					windowWithHandler.handleFormError(errorMsg, reorderByPriority);
-				} else {
-					window.location.reload();
 				}
 			}
 		} catch (error) {
 			const errorMsg = error instanceof Error ? error.message : 'Failed to reset to priority order';
 			console.error('Failed to reset to priority order:', errorMsg);
-			
+
+			// Rollback to snapshot
+			appState.set(snapshot);
+
+			// Show error message to user with retry functionality
 			const windowWithHandler = window as Window & { handleFormError?: (msg: string, retry?: () => void) => void };
 			if (typeof window !== 'undefined' && windowWithHandler.handleFormError) {
 				windowWithHandler.handleFormError(errorMsg, reorderByPriority);
-			} else {
-				window.location.reload();
 			}
 		}
 	}

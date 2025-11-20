@@ -3,6 +3,7 @@
 	import { page } from '$app/stores';
 	import { optimistikit } from 'optimistikit';
 	import { enhance as svelteKitEnhance } from '$app/forms';
+	import { SvelteMap } from 'svelte/reactivity';
 	import type { PageData } from './$types';
 import type { ActionResult } from '@sveltejs/kit';
 	import TeamManager from '$lib/components/TeamManager.svelte';
@@ -18,6 +19,10 @@ import type { ActionResult } from '@sveltejs/kit';
 	let errorMessage = $state<string>('');
 	let lastFailedAction = $state<(() => void) | null>(null);
 
+	// Snapshot storage for rollback handling
+	// Maps form submission ID to snapshot of state before optimistic update
+	const rollbackSnapshots = new SvelteMap<string, unknown>();
+
 	// Create per-request store instance
 	const appState = createAppStore(data.initialState);
 	const { teams, workPackages, unassignedWorkPackages } = createDerivedStores(appState);
@@ -27,10 +32,16 @@ import type { ActionResult } from '@sveltejs/kit';
 	setContext('teams', teams);
 	setContext('workPackages', workPackages);
 	setContext('unassignedWorkPackages', unassignedWorkPackages);
+	setContext('rollbackSnapshots', rollbackSnapshots);
 
 	// Wrap page data with optimistikit() to enable optimistic updates
 	// We only need the enhance function, not the optimistic data
-	type CreateClientAction = 'create-work-package';
+	type ClientAction =
+		| 'create-work-package'
+		| 'create-team'
+		| 'delete-team'
+		| 'delete-work-package'
+		| 'update-capacity';
 	type SubmitHandlerArgs = {
 		formData: FormData;
 		formElement: HTMLFormElement;
@@ -73,28 +84,72 @@ import type { ActionResult } from '@sveltejs/kit';
 		formData: FormData;
 		result: ActionResult;
 	}) {
-		const actionType = formElement.dataset.clientAction as CreateClientAction | undefined;
-		if (actionType !== 'create-work-package') {
+		const actionType = formElement.dataset.clientAction as ClientAction | undefined;
+		if (!actionType) {
 			return;
 		}
 
-		const pendingId = getIdFromForm(formData);
-		if (!pendingId) {
-			return;
-		}
-
-		if (result.type === 'failure' || result.type === 'error') {
-			appState.deleteWorkPackage(pendingId);
-
-			if (result.type === 'error') {
-				const message =
-					result.error instanceof Error
-						? result.error.message
-						: typeof result.error === 'string'
-							? result.error
-							: 'Failed to submit form';
-				handleFormError(message);
+		// Only rollback on failure or error
+		if (result.type !== 'failure' && result.type !== 'error') {
+			// Success - clean up any snapshots
+			let snapshotKey: string;
+			if (actionType === 'update-capacity') {
+				const teamId = formData.get('teamId') as string;
+				const yearMonth = formData.get('yearMonth') as string;
+				snapshotKey = `update-capacity-${teamId}-${yearMonth}`;
+			} else {
+				snapshotKey = actionType + '-' + getIdFromForm(formData);
 			}
+			rollbackSnapshots.delete(snapshotKey);
+			return;
+		}
+
+		// Rollback based on action type
+		switch (actionType) {
+			case 'create-work-package':
+			case 'create-team': {
+				const pendingId = getIdFromForm(formData);
+				if (pendingId) {
+					if (actionType === 'create-work-package') {
+						appState.deleteWorkPackage(pendingId);
+					} else {
+						appState.deleteTeam(pendingId);
+					}
+				}
+				break;
+			}
+
+			case 'delete-team':
+			case 'delete-work-package':
+			case 'update-capacity': {
+				let snapshotKey: string;
+				if (actionType === 'update-capacity') {
+					const teamId = formData.get('teamId') as string;
+					const yearMonth = formData.get('yearMonth') as string;
+					snapshotKey = `update-capacity-${teamId}-${yearMonth}`;
+				} else {
+					snapshotKey = actionType + '-' + getIdFromForm(formData);
+				}
+
+				const snapshot = rollbackSnapshots.get(snapshotKey);
+				if (snapshot) {
+					// Restore the full app state from snapshot
+					appState.set(snapshot as typeof $appState);
+					rollbackSnapshots.delete(snapshotKey);
+				}
+				break;
+			}
+		}
+
+		// Show error message
+		if (result.type === 'error') {
+			const message =
+				result.error instanceof Error
+					? result.error.message
+					: typeof result.error === 'string'
+						? result.error
+						: 'Failed to submit form';
+			handleFormError(message);
 		}
 	}
 

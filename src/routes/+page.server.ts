@@ -38,6 +38,17 @@ function formatErrorMessage(error: unknown): string {
 	return 'An unexpected error occurred';
 }
 
+/**
+ * Check if error is a SQLite PRIMARY KEY constraint violation
+ */
+function isPrimaryKeyViolation(error: unknown): boolean {
+	if (error && typeof error === 'object' && 'code' in error) {
+		const code = (error as { code: string }).code;
+		return code === 'SQLITE_CONSTRAINT_PRIMARYKEY' || code === 'SQLITE_CONSTRAINT';
+	}
+	return false;
+}
+
 export const load: PageServerLoad = async () => {
 	try {
 		const planningView = getPlanningView();
@@ -232,10 +243,11 @@ export const actions: Actions = {
 	},
 
 	createWorkPackage: async ({ request }) => {
+		let workPackageId: string | null = null;
 		try {
 			const data = await request.formData();
 			const idValue = data.get('id');
-			const workPackageId = typeof idValue === 'string' && idValue.length > 0 ? idValue : null;
+			workPackageId = typeof idValue === 'string' && idValue.length > 0 ? idValue : null;
 			const title = data.get('title') as string;
 			const description = data.get('description') as string | null;
 			const sizeStr = data.get('sizeInPersonMonths') as string;
@@ -279,6 +291,15 @@ export const actions: Actions = {
 			return { success: true, id: result.id ?? workPackageId };
 		} catch (error) {
 			console.error('Failed to create work package:', error);
+
+			// Check for PRIMARY KEY constraint violation (duplicate ID)
+			if (isPrimaryKeyViolation(error)) {
+				return fail(409, {
+					error: 'Duplicate work package ID',
+					details: `A work package with ID ${workPackageId} already exists`
+				});
+			}
+
 			return fail(500, {
 				error: 'Failed to create work package',
 				details: formatErrorMessage(error)
@@ -310,10 +331,11 @@ export const actions: Actions = {
 	},
 
 	createTeam: async ({ request }) => {
+		let providedId: string | null = null;
 		try {
 			const data = await request.formData();
 			const idValue = data.get('id');
-			const providedId = typeof idValue === 'string' && idValue.length > 0 ? idValue : null;
+			providedId = typeof idValue === 'string' && idValue.length > 0 ? idValue : null;
 			const name = data.get('name') as string;
 			const monthlyCapacityStr = data.get('monthlyCapacity') as string;
 
@@ -355,6 +377,15 @@ export const actions: Actions = {
 			return { success: true, id: result.id ?? providedId };
 		} catch (error) {
 			console.error('Failed to create team:', error);
+
+			// Check for PRIMARY KEY constraint violation (duplicate ID)
+			if (isPrimaryKeyViolation(error)) {
+				return fail(409, {
+					error: 'Duplicate team ID',
+					details: `A team with ID ${providedId} already exists`
+				});
+			}
+
 			return fail(500, {
 				error: 'Failed to create team',
 				details: formatErrorMessage(error)
