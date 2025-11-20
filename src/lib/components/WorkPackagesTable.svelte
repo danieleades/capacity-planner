@@ -74,11 +74,9 @@ function handleDelete(workPackage: WorkPackage) {
 				use:optimisticEnhance={(data, input) => {
 					// Optimistically remove the work package
 					const workPackageId = input.formData.get('id') as string;
-					
-					if (data.initialState) {
-						// Remove work package from array
-						data.initialState.workPackages = data.initialState.workPackages.filter((wp: WorkPackage) => wp.id !== workPackageId);
-					}
+
+					// Use store operation to delete work package
+					appState.deleteWorkPackage(workPackageId);
 				}}
 				style="display: none;"
 			>

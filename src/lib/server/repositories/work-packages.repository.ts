@@ -177,7 +177,7 @@ export async function reorderWorkPackages(
 export async function clearUnassignedPositions(db: DbParam = defaultDb): Promise<void> {
 	return dbOperation(() => {
 		db.update(workPackages)
-			.set({ scheduledPosition: null })
+			.set(withUpdatedTimestamp({ scheduledPosition: null }))
 			.where(isNull(workPackages.assignedTeamId))
 			.run();
 	}, 'Failed to clear unassigned positions');

@@ -9,6 +9,10 @@ import { teams, capacityOverrides, workPackages } from '$lib/server/schema';
  */
 export function createTestDb() {
 	const sqlite = new Database(':memory:');
+
+	// Enable foreign key constraints (SQLite disables them by default)
+	sqlite.pragma('foreign_keys = ON');
+
 	const db = drizzle(sqlite);
 
 	// Create tables directly instead of using migrations

@@ -927,6 +927,7 @@ describe('Planning Page Routes', () => {
 		it('should assign unique priority when creating work package', async () => {
 			// Create first work package
 			const formData1 = new FormData();
+			formData1.set('id', crypto.randomUUID());
 			formData1.set('title', 'First Work Package');
 			formData1.set('sizeInPersonMonths', '2.0');
 
@@ -935,6 +936,7 @@ describe('Planning Page Routes', () => {
 
 			// Create second work package
 			const formData2 = new FormData();
+			formData2.set('id', crypto.randomUUID());
 			formData2.set('title', 'Second Work Package');
 			formData2.set('sizeInPersonMonths', '3.0');
 
@@ -962,6 +964,8 @@ describe('Planning Page Routes', () => {
 		it('should not reuse priorities after deletions', async () => {
 			// Create three work packages
 			const formData1 = new FormData();
+			const id1 = crypto.randomUUID();
+			formData1.set('id', id1);
 			formData1.set('title', 'First Work Package');
 			formData1.set('sizeInPersonMonths', '2.0');
 
@@ -969,6 +973,7 @@ describe('Planning Page Routes', () => {
 			const result1 = await actions.createWorkPackage(mockEvent1 as Parameters<typeof actions.createWorkPackage>[0]);
 
 			const formData2 = new FormData();
+			formData2.set('id', crypto.randomUUID());
 			formData2.set('title', 'Second Work Package');
 			formData2.set('sizeInPersonMonths', '3.0');
 
@@ -976,6 +981,7 @@ describe('Planning Page Routes', () => {
 			await actions.createWorkPackage(mockEvent2 as Parameters<typeof actions.createWorkPackage>[0]);
 
 			const formData3 = new FormData();
+			formData3.set('id', crypto.randomUUID());
 			formData3.set('title', 'Third Work Package');
 			formData3.set('sizeInPersonMonths', '1.5');
 
@@ -993,6 +999,7 @@ describe('Planning Page Routes', () => {
 
 			// Create a new work package after deletion
 			const formData4 = new FormData();
+			formData4.set('id', crypto.randomUUID());
 			formData4.set('title', 'Fourth Work Package');
 			formData4.set('sizeInPersonMonths', '2.5');
 
@@ -1012,9 +1019,10 @@ describe('Planning Page Routes', () => {
 		it('should ensure all priority values are unique with no duplicates', async () => {
 			// Create multiple work packages
 			const titles = ['WP1', 'WP2', 'WP3', 'WP4', 'WP5'];
-			
+
 			for (const title of titles) {
 				const formData = new FormData();
+				formData.set('id', crypto.randomUUID());
 				formData.set('title', title);
 				formData.set('sizeInPersonMonths', '2.0');
 

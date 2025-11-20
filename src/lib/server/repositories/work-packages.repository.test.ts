@@ -5,12 +5,14 @@ import {
 	updateWorkPackage,
 	deleteWorkPackage,
 	assignWorkPackage,
-	unassignWorkPackage
+	unassignWorkPackage,
+	clearUnassignedPositions
 } from './work-packages.repository';
 import type { CreateWorkPackageInput } from './work-packages.repository';
 import { createTeam } from './teams.repository';
 import type { CreateTeamInput } from './teams.repository';
 import { workPackages } from '../schema';
+import { eq } from 'drizzle-orm';
 
 describe('work packages repository', () => {
 	const { db, sqlite } = createTestDb();
@@ -285,6 +287,87 @@ describe('work packages repository', () => {
 
 			const result = db.select().from(workPackages).all()[0];
 			expect(result.assignedTeamId).toBeNull();
+		});
+	});
+
+	describe('clearUnassignedPositions', () => {
+		it('should clear scheduledPosition for unassigned work packages', async () => {
+			const wp = await createWorkPackage(
+				buildWorkPackageInput({
+					title: 'Feature',
+					sizeInPersonMonths: 2.0
+				}),
+				db
+			);
+
+			// Manually set a scheduled position
+			db.update(workPackages)
+				.set({ scheduledPosition: 5 })
+				.where(eq(workPackages.id, wp.id))
+				.run();
+
+			await clearUnassignedPositions(db);
+
+			const result = db.select().from(workPackages).all()[0];
+			expect(result.scheduledPosition).toBeNull();
+		});
+
+		it('should not affect assigned work packages', async () => {
+			const team = await createTeam(
+				buildTeamInput({
+					name: 'Team A',
+					monthlyCapacity: 3.0
+				}),
+				db
+			);
+
+			const wp = await createWorkPackage(
+				buildWorkPackageInput({
+					title: 'Feature',
+					sizeInPersonMonths: 2.0
+				}),
+				db
+			);
+
+			await assignWorkPackage(wp.id, team.id, 3, db);
+
+			await clearUnassignedPositions(db);
+
+			const result = db.select().from(workPackages).all()[0];
+			expect(result.scheduledPosition).toBe(3);
+		});
+
+		it('should update timestamp when clearing positions', async () => {
+			const wp = await createWorkPackage(
+				buildWorkPackageInput({
+					title: 'Feature',
+					sizeInPersonMonths: 2.0
+				}),
+				db
+			);
+
+			// Manually set a scheduled position with an explicit old timestamp
+			const oldTimestamp = new Date('2020-01-01T00:00:00.000Z');
+			db.update(workPackages)
+				.set({ scheduledPosition: 5, updatedAt: oldTimestamp })
+				.where(eq(workPackages.id, wp.id))
+				.run();
+
+			const beforeClear = db.select().from(workPackages).all()[0];
+			expect(beforeClear.updatedAt).toEqual(oldTimestamp);
+
+			await clearUnassignedPositions(db);
+
+			const afterClear = db.select().from(workPackages).all()[0];
+			const afterTimestamp = afterClear.updatedAt;
+
+			// Timestamp should be updated to current time (much later than 2020)
+			expect(afterTimestamp).not.toEqual(oldTimestamp);
+			expect(afterTimestamp.getTime()).toBeGreaterThan(oldTimestamp.getTime());
+			// Verify it's been updated to a recent time (within last minute)
+			const now = new Date();
+			const timeDiffMs = now.getTime() - afterTimestamp.getTime();
+			expect(timeDiffMs).toBeLessThan(60000); // Less than 1 minute ago
 		});
 	});
 });

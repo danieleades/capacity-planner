@@ -74,43 +74,17 @@ $effect(() => {
 				return;
 			}
 
-			appState.update((state) => {
-				if (editingWorkPackage) {
-					return {
-						...state,
-						workPackages: state.workPackages.map((wp) =>
-							wp.id === editingWorkPackage.id
-								? {
-										...wp,
-										title,
-										sizeInPersonMonths,
-										description: description || undefined
-								  }
-								: wp
-						)
-					};
-				}
-
-				const maxPriority =
-					state.workPackages.length === 0
-						? -1
-						: Math.max(...state.workPackages.map((wp) => wp.priority));
-
-				const newWorkPackage: WorkPackage = {
-					id: idValue,
+			if (editingWorkPackage) {
+				// Use store operation to update work package
+				appState.updateWorkPackage(editingWorkPackage.id, {
 					title,
 					sizeInPersonMonths,
-					description: description || undefined,
-					priority: maxPriority + 1,
-					assignedTeamId: undefined,
-					scheduledPosition: undefined
-				};
-
-				return {
-					...state,
-					workPackages: [...state.workPackages, newWorkPackage]
-				};
-			});
+					description: description || undefined
+				});
+			} else {
+				// Use store operation to add work package
+				appState.addWorkPackage(title, sizeInPersonMonths, description || undefined, idValue);
+			}
 		}}
 		onsubmit={(e: SubmitEvent) => {
 			e.preventDefault();

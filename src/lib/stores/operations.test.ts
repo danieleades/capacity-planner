@@ -9,7 +9,9 @@ import {
 	updateWorkPackage,
 	deleteWorkPackage,
 	assignWorkPackage,
-	reorderWorkPackages
+	reorderWorkPackages,
+	batchUpdateWorkPackages,
+	clearUnassignedScheduledPositions
 } from './operations';
 import type { AppState } from '$lib/types';
 import { createMockTeam, createMockWorkPackage } from '../../test/utils/test-data';
@@ -298,6 +300,118 @@ describe('store operations', () => {
 		it('should handle empty array', () => {
 			const result = reorderWorkPackages(initialState, []);
 			expect(result.workPackages).toHaveLength(0);
+		});
+	});
+
+	describe('batchUpdateWorkPackages', () => {
+		it('should update multiple work packages atomically', () => {
+			const wp1 = createMockWorkPackage({ id: 'wp1' });
+			const wp2 = createMockWorkPackage({ id: 'wp2' });
+			const wp3 = createMockWorkPackage({ id: 'wp3' });
+			const state = { ...initialState, workPackages: [wp1, wp2, wp3] };
+
+			const result = batchUpdateWorkPackages(state, [
+				{ id: 'wp1', assignedTeamId: 'team-1', scheduledPosition: 0 },
+				{ id: 'wp3', assignedTeamId: 'team-1', scheduledPosition: 1 }
+			]);
+
+			expect(result.workPackages[0].assignedTeamId).toBe('team-1');
+			expect(result.workPackages[0].scheduledPosition).toBe(0);
+			expect(result.workPackages[1].assignedTeamId).toBeUndefined();
+			expect(result.workPackages[2].assignedTeamId).toBe('team-1');
+			expect(result.workPackages[2].scheduledPosition).toBe(1);
+		});
+
+		it('should handle null assignedTeamId', () => {
+			const wp = createMockWorkPackage({ assignedTeamId: 'team-1' });
+			const state = { ...initialState, workPackages: [wp] };
+
+			const result = batchUpdateWorkPackages(state, [
+				{ id: wp.id, assignedTeamId: null }
+			]);
+
+			expect(result.workPackages[0].assignedTeamId).toBeUndefined();
+		});
+
+		it('should not mutate original state', () => {
+			const wp = createMockWorkPackage();
+			const state = { ...initialState, workPackages: [wp] };
+			const originalTeamId = wp.assignedTeamId;
+
+			batchUpdateWorkPackages(state, [{ id: wp.id, assignedTeamId: 'team-1' }]);
+
+			expect(state.workPackages[0].assignedTeamId).toBe(originalTeamId);
+		});
+	});
+
+	describe('clearUnassignedScheduledPositions', () => {
+		it('should clear scheduledPosition for unassigned work packages', () => {
+			const wp1 = createMockWorkPackage({ assignedTeamId: undefined, scheduledPosition: 5 });
+			const wp2 = createMockWorkPackage({ assignedTeamId: undefined, scheduledPosition: 10 });
+			const state = { ...initialState, workPackages: [wp1, wp2] };
+
+			const result = clearUnassignedScheduledPositions(state);
+
+			expect(result.workPackages[0].scheduledPosition).toBeUndefined();
+			expect(result.workPackages[1].scheduledPosition).toBeUndefined();
+		});
+
+		it('should not affect assigned work packages', () => {
+			const wp1 = createMockWorkPackage({ assignedTeamId: 'team-1', scheduledPosition: 5 });
+			const wp2 = createMockWorkPackage({ assignedTeamId: undefined, scheduledPosition: 10 });
+			const state = { ...initialState, workPackages: [wp1, wp2] };
+
+			const result = clearUnassignedScheduledPositions(state);
+
+			expect(result.workPackages[0].scheduledPosition).toBe(5);
+			expect(result.workPackages[1].scheduledPosition).toBeUndefined();
+		});
+
+		it('should not mutate original state', () => {
+			const wp = createMockWorkPackage({ assignedTeamId: undefined, scheduledPosition: 5 });
+			const state = { ...initialState, workPackages: [wp] };
+
+			clearUnassignedScheduledPositions(state);
+
+			expect(state.workPackages[0].scheduledPosition).toBe(5);
+		});
+	});
+
+	describe('deleteTeam - enhanced', () => {
+		it('should clear scheduledPosition when unassigning work packages', () => {
+			const team = createMockTeam();
+			const wp = createMockWorkPackage({ assignedTeamId: team.id, scheduledPosition: 3 });
+			const state = { ...initialState, teams: [team], workPackages: [wp] };
+
+			const result = deleteTeam(state, team.id);
+
+			expect(result.workPackages[0].assignedTeamId).toBeUndefined();
+			expect(result.workPackages[0].scheduledPosition).toBeUndefined();
+		});
+	});
+
+	describe('setMonthlyCapacity - enhanced', () => {
+		it('should auto-remove override when capacity matches default', () => {
+			const team = createMockTeam({ monthlyCapacityInPersonMonths: 5.0 });
+			const state = {
+				...initialState,
+				teams: [{ ...team, capacityOverrides: [{ yearMonth: '2025-01', capacity: 3.0 }] }]
+			};
+
+			// Set capacity to match default
+			const result = setMonthlyCapacity(state, team.id, '2025-01', 5.0);
+
+			expect(result.teams[0].capacityOverrides).toHaveLength(0);
+		});
+
+		it('should add override when capacity differs from default', () => {
+			const team = createMockTeam({ monthlyCapacityInPersonMonths: 5.0 });
+			const state = { ...initialState, teams: [team] };
+
+			const result = setMonthlyCapacity(state, team.id, '2025-01', 3.0);
+
+			expect(result.teams[0].capacityOverrides).toHaveLength(1);
+			expect(result.teams[0].capacityOverrides[0].capacity).toBe(3.0);
 		});
 	});
 

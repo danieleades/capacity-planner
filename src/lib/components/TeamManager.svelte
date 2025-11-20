@@ -3,7 +3,7 @@ import { getContext } from 'svelte';
 import type { Readable } from 'svelte/store';
 import { createAppStore } from '$lib/stores/appState';
 import type { OptimisticEnhanceAction } from '$lib/types/optimistic';
-import type { Team, WorkPackage, PlanningPageData } from '$lib/types';
+import type { Team, PlanningPageData } from '$lib/types';
 import Modal from './Modal.svelte';
 import FormError from './FormError.svelte';
 import CapacitySparkline from './CapacitySparkline.svelte';
@@ -123,16 +123,9 @@ function handleDelete(team: Team) {
 						use:optimisticEnhance={(data, input) => {
 							// Optimistically remove the team
 							const teamId = input.formData.get('id') as string;
-							
-							if (data.initialState) {
-								// Remove team from teams array
-								data.initialState.teams = data.initialState.teams.filter((t: Team) => t.id !== teamId);
-								
-								// Unassign work packages from this team and clear scheduledPosition
-								data.initialState.workPackages = data.initialState.workPackages.map((wp: WorkPackage) =>
-									wp.assignedTeamId === teamId ? { ...wp, assignedTeamId: undefined, scheduledPosition: undefined } : wp
-								);
-							}
+
+							// Use store operation to delete team
+							appState.deleteTeam(teamId);
 						}}
 						style="display: none;"
 					>
@@ -195,38 +188,13 @@ function handleDelete(team: Team) {
 										method="POST" 
 										action="?/updateCapacity" 
 										use:optimisticEnhance={(data, input) => {
-											// Optimistically update the data
+											// Optimistically update the capacity override
 											const teamId = input.formData.get('teamId') as string;
 											const yearMonth = input.formData.get('yearMonth') as string;
 											const newCapacity = parseFloat(input.formData.get('capacity') as string);
-											
-											if (data.initialState) {
-												const teamIndex = data.initialState.teams.findIndex((t: Team) => t.id === teamId);
-												if (teamIndex !== -1) {
-													const team = data.initialState.teams[teamIndex];
-													const defaultCapacity = team.monthlyCapacityInPersonMonths;
-													
-													if (newCapacity !== defaultCapacity) {
-														// Add or update override
-														const overrides = team.capacityOverrides || [];
-														const overrideIndex = overrides.findIndex((o: { yearMonth: string; capacity: number }) => o.yearMonth === yearMonth);
-														
-														if (overrideIndex !== -1) {
-															overrides[overrideIndex].capacity = newCapacity;
-														} else {
-															overrides.push({ yearMonth, capacity: newCapacity });
-														}
-														
-														data.initialState.teams[teamIndex].capacityOverrides = overrides;
-													} else {
-														// Remove override if it matches default
-														if (team.capacityOverrides) {
-															data.initialState.teams[teamIndex].capacityOverrides = 
-																team.capacityOverrides.filter((o: { yearMonth: string; capacity: number }) => o.yearMonth !== yearMonth);
-														}
-													}
-												}
-											}
+
+											// Use store operation (auto-removes override if it matches default)
+											appState.setMonthlyCapacity(teamId, yearMonth, newCapacity);
 										}}
 									>
 										<input type="hidden" name="teamId" value={team.id} />
@@ -263,16 +231,10 @@ function handleDelete(team: Team) {
 		use:optimisticEnhance={(data, input) => {
 			const name = input.formData.get('name') as string;
 			const monthlyCapacity = parseFloat(input.formData.get('monthlyCapacity') as string);
-			
+
 			if (editingTeam) {
-				appState.update((state) => ({
-					...state,
-					teams: state.teams.map((team) =>
-						team.id === editingTeam
-							? { ...team, name, monthlyCapacityInPersonMonths: monthlyCapacity }
-							: team
-					)
-				}));
+				// Use store operation to update team
+				appState.updateTeam(editingTeam, { name, monthlyCapacityInPersonMonths: monthlyCapacity });
 				return;
 			}
 
@@ -281,24 +243,18 @@ function handleDelete(team: Team) {
 				return;
 			}
 
-			const newTeam: Team = {
-				id: generatedIdRaw,
-				name,
-				monthlyCapacityInPersonMonths: monthlyCapacity,
-				capacityOverrides: []
-			};
-
-			appState.update((state) => ({
-				...state,
-				teams: [...state.teams, newTeam]
-			}));
+			// Use store operation to add team
+			appState.addTeam(name, monthlyCapacity, generatedIdRaw);
 		}}
 		onsubmit={(e: SubmitEvent) => {
-			e.preventDefault();
-			if (!validateForm()) return;
-			
-			// Let the form submit naturally with optimisticEnhance
-			(e.currentTarget as HTMLFormElement).requestSubmit();
+			// Validate form before allowing submission
+			if (!validateForm()) {
+				e.preventDefault();
+				return;
+			}
+
+			// Close modal after successful validation
+			// Form will submit naturally with optimisticEnhance
 			closeModal();
 		}}
 	>

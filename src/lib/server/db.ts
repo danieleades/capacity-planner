@@ -29,6 +29,10 @@ const sqlite = new Database(getDatabasePath());
 // Enable WAL mode for better read concurrency
 sqlite.pragma('journal_mode = WAL');
 
+// Enable foreign key constraints (SQLite disables them by default)
+// This ensures CASCADE deletes and other referential actions execute
+sqlite.pragma('foreign_keys = ON');
+
 // Create Drizzle ORM instance
 export const db = drizzle(sqlite);
 

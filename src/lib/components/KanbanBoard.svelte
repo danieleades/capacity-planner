@@ -171,25 +171,12 @@
 			position: index
 		}));
 
-		// Optimistically update the store
-		appState.update((state) => {
-			const updatedWorkPackages = state.workPackages.map((wp) => {
-				const update = updates.find((u) => u.id === wp.id);
-				if (update) {
-					return {
-						...wp,
-						assignedTeamId: update.teamId ?? undefined,
-						scheduledPosition: update.position,
-					};
-				}
-				return wp;
-			});
-
-			return {
-				...state,
-				workPackages: updatedWorkPackages,
-			};
-		});
+		// Optimistically update the store using batch operation
+		appState.batchUpdateWorkPackages(updates.map(u => ({
+			id: u.id,
+			assignedTeamId: u.teamId,
+			scheduledPosition: u.position
+		})));
 
 		// Skip server request if there are no persisted updates to send
 		if (persistedUpdates.length === 0) {
@@ -212,11 +199,12 @@
 			});
 
 			const result = await response.json();
-			
-			if (result.type === 'failure') {
+
+			// Check HTTP status code first, then result type
+			if (!response.ok || result.type === 'failure') {
 				const errorMsg = result.data?.details || result.data?.error || 'Failed to reorder work packages';
 				console.error('Failed to reorder work packages:', errorMsg);
-				
+
 				// Show error message to user with retry functionality
 				const windowWithHandler = window as Window & { handleFormError?: (msg: string, retry?: () => void) => void };
 				if (typeof window !== 'undefined' && windowWithHandler.handleFormError) {
@@ -247,20 +235,7 @@
 
 	async function reorderByPriority() {
 		// Optimistically clear scheduledPosition for unassigned work packages
-		appState.update((state) => {
-			const updatedWorkPackages = state.workPackages.map((wp) => {
-				if (!wp.assignedTeamId) {
-					const { scheduledPosition: _scheduledPosition, ...rest } = wp;
-					return rest;
-				}
-				return wp;
-			});
-
-			return {
-				...state,
-				workPackages: updatedWorkPackages,
-			};
-		});
+		appState.clearUnassignedScheduledPositions();
 
 		// Persist to server using dedicated action
 		try {
@@ -270,11 +245,12 @@
 			});
 
 			const result = await response.json();
-			
-			if (result.type === 'failure') {
+
+			// Check HTTP status code first, then result type
+			if (!response.ok || result.type === 'failure') {
 				const errorMsg = result.data?.details || result.data?.error || 'Failed to reset to priority order';
 				console.error('Failed to reset to priority order:', errorMsg);
-				
+
 				// Show error and reload to revert optimistic update
 				const windowWithHandler = window as Window & { handleFormError?: (msg: string, retry?: () => void) => void };
 				if (typeof window !== 'undefined' && windowWithHandler.handleFormError) {

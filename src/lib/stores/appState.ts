@@ -15,8 +15,8 @@ export const createAppStore = (initialState?: AppState) => {
 		update,
 
 		// Team operations
-		addTeam: (name: string, capacity: number) => {
-			update((state) => ops.addTeam(state, name, capacity));
+		addTeam: (name: string, capacity: number, id?: string) => {
+			update((state) => ops.addTeam(state, name, capacity, id));
 		},
 
 		updateTeam: (id: string, updates: Partial<Omit<Team, 'id'>>) => {
@@ -37,8 +37,8 @@ export const createAppStore = (initialState?: AppState) => {
 		},
 
 		// Work package operations
-		addWorkPackage: (title: string, size: number, description?: string) => {
-			update((state) => ops.addWorkPackage(state, title, size, description));
+		addWorkPackage: (title: string, size: number, description?: string, id?: string) => {
+			update((state) => ops.addWorkPackage(state, title, size, description, id));
 		},
 
 		updateWorkPackage: (id: string, updates: Partial<Omit<WorkPackage, 'id'>>) => {
@@ -53,6 +53,13 @@ export const createAppStore = (initialState?: AppState) => {
 			update((state) => ops.assignWorkPackage(state, workPackageId, teamId));
 		},
 
+		batchUpdateWorkPackages: (updates: Array<{ id: string; assignedTeamId?: string | null; scheduledPosition?: number }>) => {
+			update((state) => ops.batchUpdateWorkPackages(state, updates));
+		},
+
+		clearUnassignedScheduledPositions: () => {
+			update((state) => ops.clearUnassignedScheduledPositions(state));
+		},
 	};
 };
 

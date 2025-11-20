@@ -14,13 +14,13 @@ export function dbOperation<T>(
 		if (result instanceof Promise) {
 			return result.catch((error) => {
 				console.error(`${errorMessage}:`, error);
-				throw new Error(errorMessage);
+				throw error; // Preserve the original error
 			});
 		}
 		return result;
 	} catch (error) {
 		console.error(`${errorMessage}:`, error);
-		throw new Error(errorMessage);
+		throw error; // Preserve the original error
 	}
 }
 
