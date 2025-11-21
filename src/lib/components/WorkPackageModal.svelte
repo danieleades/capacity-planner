@@ -74,9 +74,12 @@ $effect(() => {
 				return;
 			}
 
-			if (editingWorkPackage) {
+			// Check if this is an update by looking if the ID already exists in the store
+			const existingWorkPackage = appState.findWorkPackageById(idValue);
+
+			if (existingWorkPackage) {
 				// Use store operation to update work package
-				appState.updateWorkPackage(editingWorkPackage.id, {
+				appState.updateWorkPackage(idValue, {
 					title,
 					sizeInPersonMonths,
 					description: description || undefined

@@ -1,18 +1,25 @@
-import { writable, derived } from 'svelte/store';
+import { writable, derived, get } from 'svelte/store';
 import type { WorkPackage, Team, AppState } from '$lib/types';
 import * as ops from './operations';
 
 // Create the main state store
 export const createAppStore = (initialState?: AppState) => {
 	// Initialize with provided state or empty state
-	const { subscribe, update, set } = writable<AppState>(
+	const store = writable<AppState>(
 		initialState || { teams: [], workPackages: [] }
 	);
+	const { subscribe, update, set } = store;
 
 	return {
 		subscribe,
 		set,
 		update,
+
+		// Helper methods
+		findWorkPackageById: (id: string): WorkPackage | undefined => {
+			const state = get(store);
+			return state.workPackages.find((wp) => wp.id === id);
+		},
 
 		// Team operations
 		addTeam: (name: string, capacity: number, id?: string) => {
