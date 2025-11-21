@@ -18,11 +18,16 @@
 
 	// Modal state
 	let showAddModal = $state(false);
-	let editingWorkPackage = $state<WorkPackage | undefined>(undefined);
+	let editingWorkPackageId = $state<string | undefined>(undefined);
 	let deleteFormRefs: Record<string, HTMLFormElement | null> = {};
 
+	// Derive the actual work package object from the ID so it's always current
+	let editingWorkPackage = $derived(
+		editingWorkPackageId ? $workPackages.find((wp) => wp.id === editingWorkPackageId) : undefined
+	);
+
 	function openAddModal() {
-		editingWorkPackage = undefined;
+		editingWorkPackageId = undefined;
 		showAddModal = true;
 	}
 
@@ -32,13 +37,13 @@ function openEditModal(workPackageId: string) {
 			return;
 		}
 
-		editingWorkPackage = wp;
+		editingWorkPackageId = wp.id;
 		showAddModal = true;
 	}
 
 	function closeModal() {
 		showAddModal = false;
-		editingWorkPackage = undefined;
+		editingWorkPackageId = undefined;
 	}
 
 function handleDelete(workPackage: WorkPackage) {
