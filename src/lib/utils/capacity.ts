@@ -3,8 +3,17 @@ import type { WorkPackage, Team } from '$lib/types';
 export interface TeamBacklogMetrics {
 	teamId: string;
 	totalWorkMonths: number;
+	remainingWorkMonths: number;
 	monthsToComplete: number;
 	estimatedCompletionDate: Date | null;
+}
+
+/**
+ * Calculate remaining work for a work package based on progress
+ */
+export function getRemainingWork(wp: WorkPackage): number {
+	const progress = wp.progressPercent ?? 0;
+	return wp.sizeInPersonMonths * (1 - progress / 100);
 }
 
 /**
@@ -25,6 +34,19 @@ export function calculateTotalWorkMonths(
 	return workPackages
 		.filter((wp) => wp.assignedTeamId === teamId)
 		.reduce((sum, wp) => sum + wp.sizeInPersonMonths, 0);
+}
+
+/**
+ * Calculate the remaining work months for a team's assigned work packages
+ * Takes progress into account
+ */
+export function calculateRemainingWorkMonths(
+	teamId: string,
+	workPackages: WorkPackage[]
+): number {
+	return workPackages
+		.filter((wp) => wp.assignedTeamId === teamId)
+		.reduce((sum, wp) => sum + getRemainingWork(wp), 0);
 }
 
 /**
@@ -81,12 +103,12 @@ export function simulateWorkCompletion(
 /**
  * Calculate backlog metrics for a team with variable capacity support
  * Uses simulation to ensure monthsToComplete matches estimatedCompletionDate
- * 
+ *
  * Performance: If workPackages are already filtered for this team, pass preFiltered=true
  * to skip redundant filtering (O(1) vs O(n))
  */
 export function calculateTeamBacklog(
-	team: Team, 
+	team: Team,
 	workPackages: WorkPackage[],
 	preFiltered: boolean = false
 ): TeamBacklogMetrics {
@@ -95,17 +117,24 @@ export function calculateTeamBacklog(
 		? workPackages.reduce((sum, wp) => sum + wp.sizeInPersonMonths, 0)
 		: calculateTotalWorkMonths(team.id, workPackages);
 
-	if (totalWorkMonths <= 0) {
+	// Calculate remaining work (accounting for progress)
+	const remainingWorkMonths = preFiltered
+		? workPackages.reduce((sum, wp) => sum + getRemainingWork(wp), 0)
+		: calculateRemainingWorkMonths(team.id, workPackages);
+
+	if (remainingWorkMonths <= 0) {
 		return {
 			teamId: team.id,
-			totalWorkMonths: 0,
+			totalWorkMonths,
+			remainingWorkMonths: 0,
 			monthsToComplete: 0,
 			estimatedCompletionDate: null,
 		};
 	}
 
 	// Simulate month-by-month to get accurate metrics with variable capacity
-	let remainingWork = totalWorkMonths;
+	// Use remainingWorkMonths for scheduling (not totalWorkMonths)
+	let remainingWork = remainingWorkMonths;
 	let monthsWithCapacity = 0;
 	const currentDate = new Date();
 	currentDate.setDate(1); // Normalize to 1st of month
@@ -137,6 +166,7 @@ export function calculateTeamBacklog(
 	return {
 		teamId: team.id,
 		totalWorkMonths,
+		remainingWorkMonths,
 		monthsToComplete,
 		estimatedCompletionDate,
 	};

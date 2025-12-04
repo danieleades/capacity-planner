@@ -62,6 +62,7 @@ describe('WorkPackageModal', () => {
 				description: 'Test description',
 				sizeInPersonMonths: 2.5,
 				priority: 0,
+				progressPercent: 0,
 				assignedTeamId: undefined,
 				scheduledPosition: undefined
 			};
@@ -101,6 +102,7 @@ describe('WorkPackageModal', () => {
 				description: 'Test description',
 				sizeInPersonMonths: 2.5,
 				priority: 0,
+				progressPercent: 0,
 				assignedTeamId: undefined,
 				scheduledPosition: undefined
 			};
@@ -126,6 +128,7 @@ describe('WorkPackageModal', () => {
 				description: 'Test description',
 				sizeInPersonMonths: 2.5,
 				priority: 0,
+				progressPercent: 0,
 				assignedTeamId: undefined,
 				scheduledPosition: undefined
 			};
@@ -167,6 +170,7 @@ describe('WorkPackageModal', () => {
 				description: 'Test description',
 				sizeInPersonMonths: 2.5,
 				priority: 0,
+				progressPercent: 0,
 				assignedTeamId: undefined,
 				scheduledPosition: undefined
 			};
@@ -255,6 +259,7 @@ describe('WorkPackageModal', () => {
 				description: 'Test description',
 				sizeInPersonMonths: 2.5,
 				priority: 0,
+				progressPercent: 0,
 				assignedTeamId: undefined,
 				scheduledPosition: undefined
 			};

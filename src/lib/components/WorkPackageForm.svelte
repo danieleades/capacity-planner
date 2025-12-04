@@ -5,12 +5,16 @@
 		title: string;
 		size: number;
 		description: string;
+		progressPercent: number;
 		isEditing: boolean;
-		onSubmit: (title: string, size: number, description?: string) => void;
+		onSubmit: (title: string, size: number, description?: string, progressPercent?: number) => void;
 		onCancel: () => void;
 	}
 
-	let { title = $bindable(), size = $bindable(), description = $bindable(), isEditing, onSubmit, onCancel }: Props = $props();
+	let { title = $bindable(), size = $bindable(), description = $bindable(), progressPercent = $bindable(), isEditing, onSubmit, onCancel }: Props = $props();
+
+	// Calculate remaining work based on current values
+	let remainingWork = $derived(size * (1 - progressPercent / 100));
 
 	let titleError = $state<string | null>(null);
 	let sizeError = $state<string | null>(null);
@@ -81,7 +85,7 @@
 	<FormError error={sizeError} />
 </div>
 
-<div class="mb-6">
+<div class="mb-4">
 	<label for="wp-description" class="mb-1 block text-sm font-medium text-gray-700">
 		Description (optional)
 	</label>
@@ -95,6 +99,30 @@
 	></textarea>
 </div>
 
+{#if isEditing}
+	<div class="mb-6">
+		<label for="wp-progress" class="mb-1 block text-sm font-medium text-gray-700">
+			Progress
+		</label>
+		<div class="flex items-center gap-3">
+			<input
+				id="wp-progress"
+				name="progressPercent"
+				type="range"
+				min="0"
+				max="100"
+				step="5"
+				bind:value={progressPercent}
+				class="h-2 flex-1 cursor-pointer appearance-none rounded-lg bg-gray-200 accent-green-600"
+			/>
+			<span class="w-12 text-right font-mono text-sm">{progressPercent}%</span>
+		</div>
+		<p class="mt-1 text-xs text-gray-500">
+			Remaining: {remainingWork.toFixed(1)} PM of {size} PM total
+		</p>
+	</div>
+{/if}
+
 <div class="flex justify-end gap-2">
 	<button
 		type="button"
@@ -103,11 +131,11 @@
 	>
 		Cancel
 	</button>
-	<button 
+	<button
 		type="button"
 		onclick={() => {
 			if (!validateForm()) return;
-			onSubmit(title.trim(), size, description.trim() || undefined);
+			onSubmit(title.trim(), size, description.trim() || undefined, isEditing ? progressPercent : undefined);
 		}}
 		class="rounded bg-green-600 px-4 py-2 text-white hover:bg-green-700"
 	>

@@ -99,6 +99,7 @@ function handleDelete(workPackage: WorkPackage) {
 						<th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Priority</th>
 						<th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Title</th>
 						<th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Size (PM)</th>
+						<th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Progress</th>
 						<th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Description</th>
 						<th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Team</th>
 						<th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">Actions</th>
@@ -110,6 +111,17 @@ function handleDelete(workPackage: WorkPackage) {
 							<td class="px-4 py-3 text-sm text-gray-900">{wp.priority + 1}</td>
 							<td class="px-4 py-3 text-sm font-medium text-gray-900">{wp.title}</td>
 							<td class="px-4 py-3 text-sm text-gray-900">{wp.sizeInPersonMonths}</td>
+							<td class="px-4 py-3 text-sm text-gray-900">
+								<div class="flex items-center gap-2">
+									<div class="h-2 w-16 overflow-hidden rounded-full bg-gray-200">
+										<div
+											class="h-2 rounded-full bg-green-500"
+											style="width: {wp.progressPercent ?? 0}%"
+										></div>
+									</div>
+									<span class="text-xs text-gray-500">{wp.progressPercent ?? 0}%</span>
+								</div>
+							</td>
 							<td class="px-4 py-3 text-sm text-gray-600">
 								{wp.description || '—'}
 							</td>

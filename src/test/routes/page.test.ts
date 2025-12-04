@@ -98,13 +98,15 @@ describe('Page Component - Initial Render', () => {
 				title: 'Build Authentication',
 				description: 'Implement user login',
 				sizeInPersonMonths: 2.5,
-				priority: 0
+				priority: 0,
+				progressPercent: 0
 			},
 			{
 				id: 'wp-2',
 				title: 'Design Dashboard',
 				sizeInPersonMonths: 1.5,
-				priority: 1
+				priority: 1,
+				progressPercent: 0
 			}
 		];
 
@@ -141,6 +143,7 @@ describe('Page Component - Initial Render', () => {
 				title: 'Build Authentication',
 				sizeInPersonMonths: 2.5,
 				priority: 0,
+				progressPercent: 0,
 				assignedTeamId: 'team-1',
 				scheduledPosition: 0
 			}
@@ -180,6 +183,7 @@ describe('Page Component - Initial Render', () => {
 				title: 'Assigned Work Package',
 				sizeInPersonMonths: 2.5,
 				priority: 0,
+				progressPercent: 0,
 				assignedTeamId: 'team-1',
 				scheduledPosition: 0
 			},
@@ -187,7 +191,8 @@ describe('Page Component - Initial Render', () => {
 				id: 'wp-2',
 				title: 'Unassigned Work Package',
 				sizeInPersonMonths: 1.5,
-				priority: 1
+				priority: 1,
+				progressPercent: 0
 			}
 		];
 

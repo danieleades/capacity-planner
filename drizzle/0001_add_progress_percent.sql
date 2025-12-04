@@ -1,0 +1,1 @@
+ALTER TABLE `work_packages` ADD `progress_percent` integer DEFAULT 0 NOT NULL;

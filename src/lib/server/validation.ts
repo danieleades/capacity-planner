@@ -44,7 +44,8 @@ export const updateWorkPackageSchema = z.object({
 	sizeInPersonMonths: positiveNumber.optional(),
 	priority: nonNegativeInt.optional(),
 	assignedTeamId: z.uuid().optional().nullable(),
-	scheduledPosition: nonNegativeInt.optional().nullable()
+	scheduledPosition: nonNegativeInt.optional().nullable(),
+	progressPercent: z.number().int().min(0).max(100).optional()
 });
 
 /**

@@ -8,6 +8,13 @@
       "when": 1763411600230,
       "tag": "0000_whole_rattler",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1764839544125,
+      "tag": "0001_add_progress_percent",
+      "breakpoints": true
     }
   ]
 }

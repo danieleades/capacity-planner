@@ -19,6 +19,7 @@ export interface WorkPackage {
 	sizeInPersonMonths: number;
 	priority: number;
 	scheduledPosition: number | null;
+	progressPercent: number;
 }
 
 export interface Team {
@@ -75,7 +76,8 @@ export function getPlanningView(db: DbParam = defaultDb): PlanningView {
 				description: wp.description,
 				sizeInPersonMonths: wp.sizeInPersonMonths,
 				priority: wp.priority,
-				scheduledPosition: wp.scheduledPosition
+				scheduledPosition: wp.scheduledPosition,
+				progressPercent: wp.progressPercent
 			};
 
 			if (wp.assignedTeamId) {

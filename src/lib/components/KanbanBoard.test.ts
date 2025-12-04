@@ -62,6 +62,7 @@ describe('KanbanBoard', () => {
 						description: undefined,
 						sizeInPersonMonths: 2.0,
 						priority: 0,
+						progressPercent: 0,
 						assignedTeamId: 'team-1',
 						scheduledPosition: 0
 					}
@@ -154,6 +155,7 @@ describe('KanbanBoard', () => {
 						description: undefined,
 						sizeInPersonMonths: 3.0,
 						priority: 1,
+						progressPercent: 0,
 						assignedTeamId: 'team-1',
 						scheduledPosition: 0
 					}

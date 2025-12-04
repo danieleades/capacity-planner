@@ -20,7 +20,8 @@ export const WorkPackageSchema = z.object({
 	sizeInPersonMonths: z.number().positive('Size must be positive'),
 	priority: z.number().int().nonnegative('Priority must be a non-negative integer'),
 	assignedTeamId: z.uuid().optional(),
-	scheduledPosition: z.number().int().nonnegative().optional()
+	scheduledPosition: z.number().int().nonnegative().optional(),
+	progressPercent: z.number().int().min(0).max(100).default(0)
 });
 
 export const AppStateSchema = z
