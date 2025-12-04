@@ -50,10 +50,49 @@ export function calculateRemainingWorkMonths(
 }
 
 /**
- * Generate year-month string for a date
+ * Convert a Date to YYYY-MM format string
  */
-export function formatYearMonth(date: Date): string {
+export function toYearMonth(date: Date): string {
 	return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/**
+ * Sort work packages by scheduled position (for board view) with fallback to priority
+ * Returns a new sorted array without mutating the original
+ */
+export function sortByScheduledPosition(workPackages: WorkPackage[]): WorkPackage[] {
+	return [...workPackages].sort((a, b) => {
+		const posA = a.scheduledPosition ?? a.priority;
+		const posB = b.scheduledPosition ?? b.priority;
+		return posA - posB;
+	});
+}
+
+/**
+ * Group work packages by their assigned team
+ * Returns a map of teamId -> work packages, plus an array of unassigned work packages
+ */
+export function groupWorkPackagesByTeam(workPackages: WorkPackage[]): {
+	byTeam: Map<string, WorkPackage[]>;
+	unassigned: WorkPackage[];
+} {
+	const byTeam = new Map<string, WorkPackage[]>();
+	const unassigned: WorkPackage[] = [];
+
+	for (const wp of workPackages) {
+		if (wp.assignedTeamId) {
+			const existing = byTeam.get(wp.assignedTeamId);
+			if (existing) {
+				existing.push(wp);
+			} else {
+				byTeam.set(wp.assignedTeamId, [wp]);
+			}
+		} else {
+			unassigned.push(wp);
+		}
+	}
+
+	return { byTeam, unassigned };
 }
 
 /**
@@ -77,7 +116,7 @@ export function simulateWorkCompletion(
 	const maxMonths = 240; // 20 years
 
 	while (remainingWork > 0 && monthsElapsed < maxMonths) {
-		const yearMonth = formatYearMonth(currentDate);
+		const yearMonth = toYearMonth(currentDate);
 		const monthCapacity = getCapacityForMonth(team, yearMonth);
 
 		// Skip months with zero capacity instead of aborting
@@ -143,7 +182,7 @@ export function calculateTeamBacklog(
 	let estimatedCompletionDate: Date | null = null;
 
 	for (let i = 0; i < maxMonths && remainingWork > 0; i++) {
-		const yearMonth = formatYearMonth(currentDate);
+		const yearMonth = toYearMonth(currentDate);
 		const monthCapacity = getCapacityForMonth(team, yearMonth);
 
 		if (monthCapacity > 0) {
@@ -191,6 +230,86 @@ export function formatMonths(months: number): string {
 export function formatDate(date: Date | null): string {
 	if (!date) return 'Never';
 	return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+/**
+ * Scheduled work package with calculated start and end dates
+ * Tracks fractional month positions to avoid compounding rounding errors
+ */
+export interface ScheduledWorkPackage {
+	workPackage: WorkPackage;
+	startYearMonth: string;
+	endYearMonth: string;
+}
+
+/**
+ * Calculate the schedule for work packages assigned to a team
+ * Work packages are scheduled sequentially (finish-to-start) based on scheduledPosition/priority
+ *
+ * Uses fractional capacity tracking to avoid compounding rounding errors:
+ * - If WP-A finishes mid-February, WP-B starts mid-February (not March)
+ * - Leftover capacity carries forward to the next work package
+ * - Display shows all months where the WP is active (even partially)
+ *
+ * @param team - The team to schedule work for
+ * @param workPackages - Work packages assigned to this team (should be pre-filtered)
+ * @param startDate - When to start scheduling (defaults to today)
+ * @returns Array of work packages with their scheduled start/end months
+ */
+export function calculateTeamSchedule(
+	team: Team,
+	workPackages: WorkPackage[],
+	startDate: Date = new Date()
+): ScheduledWorkPackage[] {
+	const sorted = sortByScheduledPosition(workPackages);
+	const schedule: ScheduledWorkPackage[] = [];
+	let currentMonth = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+	let availableCapacityThisMonth = getCapacityForMonth(team, toYearMonth(currentMonth));
+	const maxMonths = 240;
+	let monthsProcessed = 0;
+
+	for (const wp of sorted) {
+		let remainingWork = getRemainingWork(wp);
+		if (remainingWork <= 0) continue;
+
+		const startYearMonth = toYearMonth(currentMonth);
+		let endYearMonth = startYearMonth;
+
+		// Consume capacity month by month until work is complete
+		while (remainingWork > 0 && monthsProcessed < maxMonths) {
+			// Skip months with zero capacity
+			if (availableCapacityThisMonth <= 0) {
+				currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1);
+				availableCapacityThisMonth = getCapacityForMonth(team, toYearMonth(currentMonth));
+				monthsProcessed++;
+				continue;
+			}
+
+			const workDoneThisMonth = Math.min(remainingWork, availableCapacityThisMonth);
+			remainingWork -= workDoneThisMonth;
+			availableCapacityThisMonth -= workDoneThisMonth;
+
+			endYearMonth = toYearMonth(currentMonth);
+
+			// If we've used all capacity this month, move to next
+			if (availableCapacityThisMonth <= 0 && remainingWork > 0) {
+				currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1);
+				availableCapacityThisMonth = getCapacityForMonth(team, toYearMonth(currentMonth));
+				monthsProcessed++;
+			}
+		}
+
+		// Only add if we could complete the work
+		if (remainingWork <= 0) {
+			schedule.push({
+				workPackage: wp,
+				startYearMonth,
+				endYearMonth,
+			});
+		}
+	}
+
+	return schedule;
 }
 
 /**

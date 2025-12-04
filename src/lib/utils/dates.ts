@@ -40,3 +40,37 @@ export function getCurrentMonth(): string {
 	const month = String(today.getMonth() + 1).padStart(2, '0');
 	return `${year}-${month}`;
 }
+
+/**
+ * Get months in a range from startMonth to endMonth (inclusive)
+ * Both parameters should be in YYYY-MM format
+ */
+export function getMonthsInRange(startMonth: string, endMonth: string): string[] {
+	const months: string[] = [];
+
+	const [startYear, startMo] = startMonth.split('-').map(Number);
+	const [endYear, endMo] = endMonth.split('-').map(Number);
+
+	let currentDate = new Date(startYear, startMo - 1, 1);
+	const endDate = new Date(endYear, endMo - 1, 1);
+
+	while (currentDate <= endDate) {
+		const year = currentDate.getFullYear();
+		const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+		months.push(`${year}-${month}`);
+
+		currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1);
+	}
+
+	return months;
+}
+
+/**
+ * Calculate the number of months between two YYYY-MM dates (inclusive)
+ */
+export function monthsBetween(startMonth: string, endMonth: string): number {
+	const [startYear, startMo] = startMonth.split('-').map(Number);
+	const [endYear, endMo] = endMonth.split('-').map(Number);
+
+	return (endYear - startYear) * 12 + (endMo - startMo) + 1;
+}

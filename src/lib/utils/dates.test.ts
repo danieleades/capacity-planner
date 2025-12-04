@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { getNextMonths, formatYearMonth, getCurrentMonth } from './dates';
+import { getNextMonths, formatYearMonth, getCurrentMonth, getMonthsInRange, monthsBetween } from './dates';
 
 describe('date utilities', () => {
 	describe('getNextMonths', () => {
@@ -129,6 +129,57 @@ describe('date utilities', () => {
 
 		afterEach(() => {
 			vi.useRealTimers();
+		});
+	});
+
+	describe('getMonthsInRange', () => {
+		it('should return single month when start equals end', () => {
+			const result = getMonthsInRange('2025-01', '2025-01');
+			expect(result).toEqual(['2025-01']);
+		});
+
+		it('should return months in range inclusive', () => {
+			const result = getMonthsInRange('2025-01', '2025-03');
+			expect(result).toEqual(['2025-01', '2025-02', '2025-03']);
+		});
+
+		it('should handle year boundary', () => {
+			const result = getMonthsInRange('2024-11', '2025-02');
+			expect(result).toEqual(['2024-11', '2024-12', '2025-01', '2025-02']);
+		});
+
+		it('should handle multi-year range', () => {
+			const result = getMonthsInRange('2024-01', '2026-01');
+			expect(result).toHaveLength(25); // 24 months + 1
+			expect(result[0]).toBe('2024-01');
+			expect(result[24]).toBe('2026-01');
+		});
+
+		it('should return empty array when end is before start', () => {
+			const result = getMonthsInRange('2025-03', '2025-01');
+			expect(result).toEqual([]);
+		});
+	});
+
+	describe('monthsBetween', () => {
+		it('should return 1 for same month', () => {
+			expect(monthsBetween('2025-01', '2025-01')).toBe(1);
+		});
+
+		it('should count months inclusive', () => {
+			expect(monthsBetween('2025-01', '2025-03')).toBe(3);
+		});
+
+		it('should handle year boundary', () => {
+			expect(monthsBetween('2024-11', '2025-02')).toBe(4);
+		});
+
+		it('should handle multi-year span', () => {
+			expect(monthsBetween('2024-01', '2026-01')).toBe(25);
+		});
+
+		it('should return negative for reversed range', () => {
+			expect(monthsBetween('2025-03', '2025-01')).toBe(-1);
 		});
 	});
 });

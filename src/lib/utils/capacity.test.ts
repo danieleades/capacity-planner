@@ -2,11 +2,13 @@ import { describe, it, expect, vi } from 'vitest';
 import {
 	getCapacityForMonth,
 	calculateTotalWorkMonths,
-	formatYearMonth,
+	toYearMonth,
 	simulateWorkCompletion,
 	calculateTeamBacklog,
 	formatMonths,
 	formatDate,
+	sortByScheduledPosition,
+	groupWorkPackagesByTeam,
 } from './capacity';
 import { createMockTeam, createMockWorkPackage } from '../../test/utils/test-data';
 
@@ -62,22 +64,22 @@ describe('capacity utilities', () => {
 		});
 	});
 
-	describe('formatYearMonth', () => {
+	describe('toYearMonth', () => {
 		it('should format date as YYYY-MM', () => {
 			const date = new Date('2025-01-15');
-			const result = formatYearMonth(date);
+			const result = toYearMonth(date);
 			expect(result).toBe('2025-01');
 		});
 
 		it('should pad single-digit months with zero', () => {
 			const date = new Date('2025-03-01');
-			const result = formatYearMonth(date);
+			const result = toYearMonth(date);
 			expect(result).toBe('2025-03');
 		});
 
 		it('should handle December correctly', () => {
 			const date = new Date('2025-12-31');
-			const result = formatYearMonth(date);
+			const result = toYearMonth(date);
 			expect(result).toBe('2025-12');
 		});
 	});
@@ -304,6 +306,96 @@ describe('capacity utilities', () => {
 			const date = new Date('2025-12-25');
 			const result = formatDate(date);
 			expect(result).toMatch(/Dec.*25.*2025/);
+		});
+	});
+
+	describe('sortByScheduledPosition', () => {
+		it('should sort by scheduledPosition when present', () => {
+			const workPackages = [
+				createMockWorkPackage({ id: 'a', priority: 0, scheduledPosition: 2 }),
+				createMockWorkPackage({ id: 'b', priority: 1, scheduledPosition: 0 }),
+				createMockWorkPackage({ id: 'c', priority: 2, scheduledPosition: 1 }),
+			];
+			const result = sortByScheduledPosition(workPackages);
+			expect(result.map((wp) => wp.id)).toEqual(['b', 'c', 'a']);
+		});
+
+		it('should fall back to priority when scheduledPosition is undefined', () => {
+			const workPackages = [
+				createMockWorkPackage({ id: 'a', priority: 2 }),
+				createMockWorkPackage({ id: 'b', priority: 0 }),
+				createMockWorkPackage({ id: 'c', priority: 1 }),
+			];
+			const result = sortByScheduledPosition(workPackages);
+			expect(result.map((wp) => wp.id)).toEqual(['b', 'c', 'a']);
+		});
+
+		it('should handle mixed scheduledPosition and priority', () => {
+			const workPackages = [
+				createMockWorkPackage({ id: 'a', priority: 5 }), // No position, uses priority 5
+				createMockWorkPackage({ id: 'b', priority: 0, scheduledPosition: 1 }), // Position 1
+				createMockWorkPackage({ id: 'c', priority: 10, scheduledPosition: 0 }), // Position 0
+			];
+			const result = sortByScheduledPosition(workPackages);
+			expect(result.map((wp) => wp.id)).toEqual(['c', 'b', 'a']);
+		});
+
+		it('should not mutate the original array', () => {
+			const workPackages = [
+				createMockWorkPackage({ id: 'a', priority: 1 }),
+				createMockWorkPackage({ id: 'b', priority: 0 }),
+			];
+			const original = [...workPackages];
+			sortByScheduledPosition(workPackages);
+			expect(workPackages).toEqual(original);
+		});
+
+		it('should return empty array for empty input', () => {
+			expect(sortByScheduledPosition([])).toEqual([]);
+		});
+	});
+
+	describe('groupWorkPackagesByTeam', () => {
+		it('should group work packages by team', () => {
+			const workPackages = [
+				createMockWorkPackage({ id: 'a', assignedTeamId: 'team-1' }),
+				createMockWorkPackage({ id: 'b', assignedTeamId: 'team-2' }),
+				createMockWorkPackage({ id: 'c', assignedTeamId: 'team-1' }),
+			];
+			const result = groupWorkPackagesByTeam(workPackages);
+
+			expect(result.byTeam.get('team-1')?.map((wp) => wp.id)).toEqual(['a', 'c']);
+			expect(result.byTeam.get('team-2')?.map((wp) => wp.id)).toEqual(['b']);
+			expect(result.unassigned).toEqual([]);
+		});
+
+		it('should separate unassigned work packages', () => {
+			const workPackages = [
+				createMockWorkPackage({ id: 'a', assignedTeamId: 'team-1' }),
+				createMockWorkPackage({ id: 'b', assignedTeamId: undefined }),
+				createMockWorkPackage({ id: 'c' }), // No assignedTeamId
+			];
+			const result = groupWorkPackagesByTeam(workPackages);
+
+			expect(result.byTeam.get('team-1')?.map((wp) => wp.id)).toEqual(['a']);
+			expect(result.unassigned.map((wp) => wp.id)).toEqual(['b', 'c']);
+		});
+
+		it('should handle all unassigned', () => {
+			const workPackages = [
+				createMockWorkPackage({ id: 'a' }),
+				createMockWorkPackage({ id: 'b' }),
+			];
+			const result = groupWorkPackagesByTeam(workPackages);
+
+			expect(result.byTeam.size).toBe(0);
+			expect(result.unassigned.map((wp) => wp.id)).toEqual(['a', 'b']);
+		});
+
+		it('should handle empty array', () => {
+			const result = groupWorkPackagesByTeam([]);
+			expect(result.byTeam.size).toBe(0);
+			expect(result.unassigned).toEqual([]);
 		});
 	});
 });
