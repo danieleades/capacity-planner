@@ -49,6 +49,7 @@ export const workPackages = sqliteTable(
 		priority: integer('priority').notNull(),
 		assignedTeamId: text('assigned_team_id').references(() => teams.id, { onDelete: 'set null' }),
 		scheduledPosition: integer('scheduled_position'),
+		progressPercent: integer('progress_percent').notNull().default(0),
 		createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 		updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull()
 	},

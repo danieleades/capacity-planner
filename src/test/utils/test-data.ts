@@ -22,6 +22,7 @@ export function createMockWorkPackage(overrides?: Partial<WorkPackage>): WorkPac
 		title: 'Test Work Package',
 		sizeInPersonMonths: 1.0,
 		priority: 0,
+		progressPercent: 0,
 		assignedTeamId: undefined,
 		...overrides,
 	};

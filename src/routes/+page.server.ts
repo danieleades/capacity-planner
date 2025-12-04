@@ -63,9 +63,10 @@ export const load: PageServerLoad = async () => {
 				sizeInPersonMonths: wp.sizeInPersonMonths,
 				priority: wp.priority,
 				assignedTeamId: undefined,
-				scheduledPosition: wp.scheduledPosition ?? undefined
+				scheduledPosition: wp.scheduledPosition ?? undefined,
+				progressPercent: wp.progressPercent
 			})),
-			...planningView.teams.flatMap(team => 
+			...planningView.teams.flatMap(team =>
 				team.workPackages.map(wp => ({
 					id: wp.id,
 					title: wp.title,
@@ -73,7 +74,8 @@ export const load: PageServerLoad = async () => {
 					sizeInPersonMonths: wp.sizeInPersonMonths,
 					priority: wp.priority,
 					assignedTeamId: team.id,
-					scheduledPosition: wp.scheduledPosition ?? undefined
+					scheduledPosition: wp.scheduledPosition ?? undefined,
+					progressPercent: wp.progressPercent
 				}))
 			)
 		];
@@ -201,6 +203,7 @@ export const actions: Actions = {
 				title?: string;
 				description?: string | null;
 				sizeInPersonMonths?: number;
+				progressPercent?: number;
 			} = {};
 
 			const title = data.get('title') as string | null;
@@ -229,6 +232,18 @@ export const actions: Actions = {
 					});
 				}
 				updateData.sizeInPersonMonths = size;
+			}
+
+			const progressStr = data.get('progressPercent') as string | null;
+			if (progressStr !== null) {
+				const progress = parseInt(progressStr, 10);
+				if (isNaN(progress) || progress < 0 || progress > 100) {
+					return fail(400, {
+						error: 'Invalid progress',
+						details: 'Progress must be a number between 0 and 100'
+					});
+				}
+				updateData.progressPercent = progress;
 			}
 
 			await updateWorkPackage(id, updateData);

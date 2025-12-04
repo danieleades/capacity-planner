@@ -20,36 +20,42 @@ import { generateId } from '$lib/utils/id';
 	let formTitle = $state('');
 	let formSize = $state(0);
 	let formDescription = $state('');
+	let formProgressPercent = $state(0);
 	let workPackageFormRef = $state<HTMLFormElement | null>(null);
-let newWorkPackageId = $state<string>(generateId());
-const appState = getContext<ReturnType<typeof createAppStore>>('appState');
+	let newWorkPackageId = $state<string>(generateId());
+	const appState = getContext<ReturnType<typeof createAppStore>>('appState');
 
 	// Update form when editingWorkPackage changes
-$effect(() => {
-	if (editingWorkPackage) {
-		formTitle = editingWorkPackage.title;
-		formSize = editingWorkPackage.sizeInPersonMonths;
-		formDescription = editingWorkPackage.description || '';
-		return;
-	}
+	$effect(() => {
+		if (editingWorkPackage) {
+			formTitle = editingWorkPackage.title;
+			formSize = editingWorkPackage.sizeInPersonMonths;
+			formDescription = editingWorkPackage.description || '';
+			formProgressPercent = editingWorkPackage.progressPercent ?? 0;
+			return;
+		}
 
-	if (open) {
-		formTitle = '';
-		formSize = 0;
-		formDescription = '';
-		newWorkPackageId = generateId();
-	}
-});
+		if (open) {
+			formTitle = '';
+			formSize = 0;
+			formDescription = '';
+			formProgressPercent = 0;
+			newWorkPackageId = generateId();
+		}
+	});
 
-	function handleSubmit(title: string, size: number, description?: string) {
+	function handleSubmit(title: string, size: number, description?: string, progressPercent?: number) {
 		// Update form values and submit the form to trigger server action
 		formTitle = title;
 		formSize = size;
 		formDescription = description || '';
-		
+		if (progressPercent !== undefined) {
+			formProgressPercent = progressPercent;
+		}
+
 		// Submit the form
 		workPackageFormRef?.requestSubmit();
-		
+
 		// Close modal after submission
 		onClose();
 	}
@@ -69,6 +75,8 @@ $effect(() => {
 			const title = input.formData.get('title') as string;
 			const sizeInPersonMonths = parseFloat(input.formData.get('sizeInPersonMonths') as string);
 			const description = input.formData.get('description') as string | null;
+			const progressPercentStr = input.formData.get('progressPercent') as string | null;
+			const progressPercent = progressPercentStr ? parseInt(progressPercentStr, 10) : undefined;
 			const idValue = input.formData.get('id');
 			if (typeof idValue !== 'string' || idValue.length === 0) {
 				return;
@@ -82,7 +90,8 @@ $effect(() => {
 				appState.updateWorkPackage(idValue, {
 					title,
 					sizeInPersonMonths,
-					description: description || undefined
+					description: description || undefined,
+					...(progressPercent !== undefined ? { progressPercent } : {})
 				});
 			} else {
 				// Use store operation to add work package
@@ -104,6 +113,7 @@ $effect(() => {
 			bind:title={formTitle}
 			bind:size={formSize}
 			bind:description={formDescription}
+			bind:progressPercent={formProgressPercent}
 			isEditing={!!editingWorkPackage}
 			onSubmit={handleSubmit}
 			onCancel={onClose}

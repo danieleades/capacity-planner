@@ -333,9 +333,15 @@
 								{/if}
 							</div>
 							<p class="text-gray-600">
-								Backlog: <span class="font-medium"
-									>{column.capacity.totalWorkMonths.toFixed(1)} person-months</span
+								Backlog:
+								<span class="font-medium"
+									>{column.capacity.remainingWorkMonths.toFixed(1)} PM</span
 								>
+								{#if column.capacity.totalWorkMonths !== column.capacity.remainingWorkMonths}
+									<span class="text-gray-400">
+										/ {column.capacity.totalWorkMonths.toFixed(1)} total
+									</span>
+								{/if}
 							</p>
 							<p class="text-gray-600">
 								Time to complete: <span class="font-medium"
@@ -375,6 +381,22 @@
 								</span>
 								<span class="text-gray-400">Priority: {wp.priority + 1}</span>
 							</div>
+							{#if (wp.progressPercent ?? 0) > 0}
+								<div class="mt-2">
+									<div class="flex items-center justify-between text-xs text-gray-500">
+										<span>{wp.progressPercent}% complete</span>
+										<span class="text-gray-400">
+											{(wp.sizeInPersonMonths * (1 - (wp.progressPercent ?? 0) / 100)).toFixed(1)} PM left
+										</span>
+									</div>
+									<div class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
+										<div
+											class="h-1.5 rounded-full bg-green-500"
+											style="width: {wp.progressPercent}%"
+										></div>
+									</div>
+								</div>
+							{/if}
 						</div>
 					{/each}
 				</div>

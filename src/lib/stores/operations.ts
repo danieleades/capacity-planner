@@ -132,6 +132,7 @@ export function addWorkPackage(
 				priority: maxPriority + 1,
 				assignedTeamId: undefined,
 				scheduledPosition: undefined,
+				progressPercent: 0,
 			},
 		],
 	};
