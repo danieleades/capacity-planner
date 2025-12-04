@@ -7,6 +7,8 @@
 		calculateTeamBacklog,
 		formatMonths,
 		formatDate,
+		getRemainingWork,
+		calculateCardHeight,
 		type TeamBacklogMetrics,
 	} from '$lib/utils/capacity';
 	import type { WorkPackage, Team, PlanningPageData } from '$lib/types';
@@ -29,6 +31,20 @@
 	// Modal state
 	let showAddModal = $state(false);
 	let editingWorkPackage = $state<WorkPackage | undefined>(undefined);
+
+	// View settings (persisted to localStorage)
+	const SIZE_SCALING_KEY = 'kanban-size-scaling-intensity';
+	let sizeScalingIntensity = $state(
+		typeof localStorage !== 'undefined'
+			? parseInt(localStorage.getItem(SIZE_SCALING_KEY) ?? '0', 10)
+			: 0
+	);
+
+	$effect(() => {
+		if (typeof localStorage !== 'undefined') {
+			localStorage.setItem(SIZE_SCALING_KEY, String(sizeScalingIntensity));
+		}
+	});
 
 	function openAddModal() {
 		editingWorkPackage = undefined;
@@ -118,6 +134,11 @@
 	$effect(() => {
 		columns = buildColumns();
 	});
+
+	// Calculate global maximum remaining work across all work packages for size scaling
+	const globalMaxRemainingWork = $derived(
+		$appState.workPackages.reduce((max, wp) => Math.max(max, getRemainingWork(wp)), 0)
+	);
 
 	function handleDndConsider(columnId: string, e: CustomEvent) {
 		// Update local state during drag for visual feedback
@@ -286,7 +307,23 @@
 </script>
 
 <div class="mb-6">
-	<h2 class="mb-4 text-2xl font-bold">Capacity Planning Board</h2>
+	<div class="mb-4 flex items-center justify-between">
+		<h2 class="text-2xl font-bold">Capacity Planning Board</h2>
+		<div class="flex items-center gap-3">
+			<label for="size-scaling" class="text-sm text-gray-600">Size scaling</label>
+			<input
+				id="size-scaling"
+				type="range"
+				min="0"
+				max="100"
+				step="10"
+				bind:value={sizeScalingIntensity}
+				class="h-2 w-24 cursor-pointer appearance-none rounded-lg bg-gray-200 accent-blue-600"
+				title="Scale card height by remaining work (0% = off, 100% = maximum)"
+			/>
+			<span class="w-8 text-sm text-gray-500">{sizeScalingIntensity}%</span>
+		</div>
+	</div>
 
 	<div class="flex gap-4 overflow-x-auto pb-4">
 		{#each columns as column (column.id)}
@@ -343,16 +380,22 @@
 									</span>
 								{/if}
 							</p>
-							<p class="text-gray-600">
-								Time to complete: <span class="font-medium"
-									>{formatMonths(column.capacity.monthsToComplete)}</span
-								>
-							</p>
-							<p class="text-gray-600">
-								Est. completion: <span class="font-medium"
-									>{formatDate(column.capacity.estimatedCompletionDate)}</span
-								>
-							</p>
+							{#if column.capacity.remainingWorkMonths === 0 && column.capacity.totalWorkMonths > 0}
+								<p class="text-green-600">
+									<span class="font-medium">All work complete!</span>
+								</p>
+							{:else}
+								<p class="text-gray-600">
+									Time to complete: <span class="font-medium"
+										>{formatMonths(column.capacity.monthsToComplete)}</span
+									>
+								</p>
+								<p class="text-gray-600">
+									Est. completion: <span class="font-medium"
+										>{formatDate(column.capacity.estimatedCompletionDate)}</span
+									>
+								</p>
+							{/if}
 						</div>
 					{:else}
 						<p class="text-sm text-gray-500">Drag work packages here to assign to teams</p>
@@ -370,7 +413,13 @@
 					onfinalize={(e) => handleDndFinalize(column.id, e)}
 				>
 					{#each column.items as wp (wp.id)}
-						<div class="mb-2 cursor-move rounded border border-gray-300 bg-white p-3 shadow-sm">
+						{@const cardHeight = sizeScalingIntensity > 0
+							? calculateCardHeight(getRemainingWork(wp), globalMaxRemainingWork, sizeScalingIntensity)
+							: null}
+						<div
+							class="mb-2 cursor-move rounded border border-gray-300 bg-white p-3 shadow-sm transition-all duration-200"
+							style={cardHeight ? `min-height: ${cardHeight}px` : ''}
+						>
 							<h4 class="mb-1 font-medium">{wp.title}</h4>
 							{#if wp.description}
 								<p class="mb-2 text-xs text-gray-600">{wp.description}</p>

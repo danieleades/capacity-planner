@@ -192,3 +192,37 @@ export function formatDate(date: Date | null): string {
 	if (!date) return 'Never';
 	return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }
+
+/**
+ * Card height scaling configuration
+ */
+export const CARD_HEIGHT_CONFIG = {
+	minHeight: 80, // px - minimum height for card content
+	maxHeight: 500, // px - maximum at full scaling intensity
+} as const;
+
+/**
+ * Calculate the visual height of a work package card based on remaining work
+ * Uses clamped linear scaling relative to the global maximum
+ *
+ * @param remainingWork - Remaining work for this work package
+ * @param globalMaxRemainingWork - Maximum remaining work across all work packages
+ * @param scalingIntensity - Scaling intensity from 0 (no scaling) to 100 (full scaling)
+ * @returns Height in pixels
+ */
+export function calculateCardHeight(
+	remainingWork: number,
+	globalMaxRemainingWork: number,
+	scalingIntensity: number = 100
+): number {
+	const { minHeight, maxHeight } = CARD_HEIGHT_CONFIG;
+
+	if (globalMaxRemainingWork <= 0 || scalingIntensity <= 0) return minHeight;
+
+	// Effective max height based on scaling intensity (0-100%)
+	const effectiveMaxHeight = minHeight + (maxHeight - minHeight) * (scalingIntensity / 100);
+
+	// Linear scaling: 0 remaining -> minHeight, max remaining -> effectiveMaxHeight
+	const scale = Math.min(remainingWork / globalMaxRemainingWork, 1);
+	return minHeight + scale * (effectiveMaxHeight - minHeight);
+}
