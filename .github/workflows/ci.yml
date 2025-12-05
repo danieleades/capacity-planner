@@ -6,6 +6,10 @@ on:
       - main
   pull_request:
 
+permissions:
+  contents: read
+  id-token: write
+
 env:
   NODE_VERSION: 24
 
@@ -72,8 +76,6 @@ jobs:
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
-        permissions:
-          id-token: write
         with:
           use_oidc: true
           files: ./coverage/coverage-final.json
