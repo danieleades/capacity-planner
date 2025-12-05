@@ -96,7 +96,10 @@ vi.mock('$lib/server/repositories/work-packages.repository', async () => {
 		deleteWorkPackage: (id: string) => actual.deleteWorkPackage(id, testDb),
 		assignWorkPackage: (workPackageId: string, teamId: string, position: number) =>
 			actual.assignWorkPackage(workPackageId, teamId, position, testDb),
-		unassignWorkPackage: (workPackageId: string) => actual.unassignWorkPackage(workPackageId, testDb)
+		unassignWorkPackage: (workPackageId: string) => actual.unassignWorkPackage(workPackageId, testDb),
+		reorderWorkPackages: (updates: Parameters<typeof actual.reorderWorkPackages>[0]) =>
+			actual.reorderWorkPackages(updates, testDb),
+		clearUnassignedPositions: () => actual.clearUnassignedPositions(testDb)
 	};
 });
 
@@ -1038,13 +1041,452 @@ describe('Planning Page Routes', () => {
 
 			expect(result.initialState.workPackages).toHaveLength(5);
 			const priorities = result.initialState.workPackages.map((wp: WorkPackage) => wp.priority);
-			
+
 			// Check that all priorities are unique
 			const uniquePriorities = new Set(priorities);
 			expect(uniquePriorities.size).toBe(5);
-			
+
 			// Check that priorities are sequential starting from 0
 			expect(priorities.sort()).toEqual([0, 1, 2, 3, 4]);
+		});
+	});
+
+	describe('reorderWorkPackages action', () => {
+		it('should reorder work packages successfully', async () => {
+			const team = await insertTeam({
+				name: 'Test Team',
+				monthlyCapacity: 3.0
+			});
+
+			const wp1 = await insertWorkPackage({ title: 'WP1', sizeInPersonMonths: 1.0 });
+			const wp2 = await insertWorkPackage({ title: 'WP2', sizeInPersonMonths: 1.0 });
+
+			await assignWorkPackage(wp1.id, team.id, 0, testDb);
+			await assignWorkPackage(wp2.id, team.id, 1, testDb);
+
+			const formData = new FormData();
+			formData.set('updates', JSON.stringify([
+				{ id: wp1.id, teamId: team.id, position: 1 },
+				{ id: wp2.id, teamId: team.id, position: 0 }
+			]));
+
+			const mockEvent = createMockRequest(formData);
+			const result = await actions.reorderWorkPackages(mockEvent as Parameters<typeof actions.reorderWorkPackages>[0]);
+
+			expect(result).toEqual({ success: true });
+
+			// Verify the reorder
+			const view = await load({} as Parameters<typeof load>[0]);
+			if (!view || !('initialState' in view)) {
+				throw new Error('Expected initialState in result');
+			}
+			const reorderedWp1 = view.initialState.workPackages.find((w: WorkPackage) => w.id === wp1.id);
+			const reorderedWp2 = view.initialState.workPackages.find((w: WorkPackage) => w.id === wp2.id);
+			expect(reorderedWp1?.scheduledPosition).toBe(1);
+			expect(reorderedWp2?.scheduledPosition).toBe(0);
+		});
+
+		it('should return error when updates is missing', async () => {
+			const formData = new FormData();
+
+			const mockEvent = createMockRequest(formData);
+			const result = await actions.reorderWorkPackages(mockEvent as Parameters<typeof actions.reorderWorkPackages>[0]);
+
+			expect(result).toHaveProperty('status', 400);
+			expectErrorMessage(result, 'Missing updates data');
+		});
+
+		it('should return error when updates is invalid JSON', async () => {
+			const formData = new FormData();
+			formData.set('updates', 'not valid json');
+
+			const mockEvent = createMockRequest(formData);
+			const result = await actions.reorderWorkPackages(mockEvent as Parameters<typeof actions.reorderWorkPackages>[0]);
+
+			expect(result).toHaveProperty('status', 400);
+			expectErrorMessage(result, 'Invalid updates format');
+		});
+
+		it('should return error when updates is not an array', async () => {
+			const formData = new FormData();
+			formData.set('updates', JSON.stringify({ id: 'test' }));
+
+			const mockEvent = createMockRequest(formData);
+			const result = await actions.reorderWorkPackages(mockEvent as Parameters<typeof actions.reorderWorkPackages>[0]);
+
+			expect(result).toHaveProperty('status', 400);
+			expectErrorMessage(result, 'Invalid updates array');
+		});
+
+		it('should return error when updates is empty array', async () => {
+			const formData = new FormData();
+			formData.set('updates', JSON.stringify([]));
+
+			const mockEvent = createMockRequest(formData);
+			const result = await actions.reorderWorkPackages(mockEvent as Parameters<typeof actions.reorderWorkPackages>[0]);
+
+			expect(result).toHaveProperty('status', 400);
+			expectErrorMessage(result, 'Invalid updates array');
+		});
+
+		it('should return error when update object has invalid id', async () => {
+			const formData = new FormData();
+			formData.set('updates', JSON.stringify([{ id: 123, teamId: 'team-1', position: 0 }]));
+
+			const mockEvent = createMockRequest(formData);
+			const result = await actions.reorderWorkPackages(mockEvent as Parameters<typeof actions.reorderWorkPackages>[0]);
+
+			expect(result).toHaveProperty('status', 400);
+			expectErrorMessage(result, 'Invalid update object');
+		});
+
+		it('should return error when update object has invalid teamId', async () => {
+			const formData = new FormData();
+			formData.set('updates', JSON.stringify([{ id: 'wp-1', teamId: 123, position: 0 }]));
+
+			const mockEvent = createMockRequest(formData);
+			const result = await actions.reorderWorkPackages(mockEvent as Parameters<typeof actions.reorderWorkPackages>[0]);
+
+			expect(result).toHaveProperty('status', 400);
+			expectErrorMessage(result, 'Invalid update object');
+		});
+
+		it('should return error when update object has invalid position', async () => {
+			const formData = new FormData();
+			formData.set('updates', JSON.stringify([{ id: 'wp-1', teamId: 'team-1', position: -1 }]));
+
+			const mockEvent = createMockRequest(formData);
+			const result = await actions.reorderWorkPackages(mockEvent as Parameters<typeof actions.reorderWorkPackages>[0]);
+
+			expect(result).toHaveProperty('status', 400);
+			expectErrorMessage(result, 'Invalid update object');
+		});
+
+		it('should accept null teamId for unassigning', async () => {
+			const team = await insertTeam({
+				name: 'Test Team',
+				monthlyCapacity: 3.0
+			});
+
+			const wp = await insertWorkPackage({ title: 'WP1', sizeInPersonMonths: 1.0 });
+			await assignWorkPackage(wp.id, team.id, 0, testDb);
+
+			const formData = new FormData();
+			formData.set('updates', JSON.stringify([
+				{ id: wp.id, teamId: null, position: 0 }
+			]));
+
+			const mockEvent = createMockRequest(formData);
+			const result = await actions.reorderWorkPackages(mockEvent as Parameters<typeof actions.reorderWorkPackages>[0]);
+
+			expect(result).toEqual({ success: true });
+
+			// Verify the work package was unassigned
+			const view = await load({} as Parameters<typeof load>[0]);
+			if (!view || !('initialState' in view)) {
+				throw new Error('Expected initialState in result');
+			}
+			const unassignedWp = view.initialState.workPackages.find((w: WorkPackage) => w.id === wp.id);
+			expect(unassignedWp?.assignedTeamId).toBeUndefined();
+		});
+	});
+
+	describe('clearUnassignedPositions action', () => {
+		it('should clear scheduled positions for unassigned work packages', async () => {
+			const team = await insertTeam({
+				name: 'Test Team',
+				monthlyCapacity: 3.0
+			});
+
+			const wp1 = await insertWorkPackage({ title: 'WP1', sizeInPersonMonths: 1.0 });
+			const wp2 = await insertWorkPackage({ title: 'WP2', sizeInPersonMonths: 1.0 });
+
+			// Assign then unassign wp1 to leave a scheduledPosition
+			await assignWorkPackage(wp1.id, team.id, 5, testDb);
+
+			// Manually set scheduledPosition for unassigned wp2
+			const { workPackages } = await import('$lib/server/schema');
+			const { eq } = await import('drizzle-orm');
+			testDb.update(workPackages)
+				.set({ scheduledPosition: 10, assignedTeamId: null })
+				.where(eq(workPackages.id, wp2.id))
+				.run();
+
+			// Unassign wp1
+			const { unassignWorkPackage } = await import('$lib/server/repositories/work-packages.repository');
+			await unassignWorkPackage(wp1.id, testDb);
+
+			// Call clearUnassignedPositions
+			const mockEvent = {} as Parameters<typeof actions.clearUnassignedPositions>[0];
+			const result = await actions.clearUnassignedPositions(mockEvent);
+
+			expect(result).toEqual({ success: true });
+
+			// Verify positions were cleared for unassigned work packages
+			const view = await load({} as Parameters<typeof load>[0]);
+			if (!view || !('initialState' in view)) {
+				throw new Error('Expected initialState in result');
+			}
+
+			const clearedWp1 = view.initialState.workPackages.find((w: WorkPackage) => w.id === wp1.id);
+			const clearedWp2 = view.initialState.workPackages.find((w: WorkPackage) => w.id === wp2.id);
+
+			expect(clearedWp1?.scheduledPosition).toBeUndefined();
+			expect(clearedWp2?.scheduledPosition).toBeUndefined();
+		});
+
+		it('should not affect assigned work packages', async () => {
+			const team = await insertTeam({
+				name: 'Test Team',
+				monthlyCapacity: 3.0
+			});
+
+			const wp = await insertWorkPackage({ title: 'WP1', sizeInPersonMonths: 1.0 });
+			await assignWorkPackage(wp.id, team.id, 5, testDb);
+
+			// Call clearUnassignedPositions
+			const mockEvent = {} as Parameters<typeof actions.clearUnassignedPositions>[0];
+			const result = await actions.clearUnassignedPositions(mockEvent);
+
+			expect(result).toEqual({ success: true });
+
+			// Verify position was NOT cleared for assigned work package
+			const view = await load({} as Parameters<typeof load>[0]);
+			if (!view || !('initialState' in view)) {
+				throw new Error('Expected initialState in result');
+			}
+
+			const assignedWp = view.initialState.workPackages.find((w: WorkPackage) => w.id === wp.id);
+			expect(assignedWp?.scheduledPosition).toBe(5);
+			expect(assignedWp?.assignedTeamId).toBe(team.id);
+		});
+	});
+
+	describe('updateWorkPackage action', () => {
+		it('should return error when title is empty', async () => {
+			const wp = await insertWorkPackage({ title: 'Test', sizeInPersonMonths: 1.0 });
+
+			const formData = new FormData();
+			formData.set('id', wp.id);
+			formData.set('title', '   ');
+
+			const mockEvent = createMockRequest(formData);
+			const result = await actions.updateWorkPackage(mockEvent as Parameters<typeof actions.updateWorkPackage>[0]);
+
+			expect(result).toHaveProperty('status', 400);
+			expectErrorMessage(result, 'Invalid title');
+		});
+
+		it('should return error when size is zero', async () => {
+			const wp = await insertWorkPackage({ title: 'Test', sizeInPersonMonths: 1.0 });
+
+			const formData = new FormData();
+			formData.set('id', wp.id);
+			formData.set('sizeInPersonMonths', '0');
+
+			const mockEvent = createMockRequest(formData);
+			const result = await actions.updateWorkPackage(mockEvent as Parameters<typeof actions.updateWorkPackage>[0]);
+
+			expect(result).toHaveProperty('status', 400);
+			expectErrorMessage(result, 'Invalid size');
+		});
+
+		it('should return error when progress is over 100', async () => {
+			const wp = await insertWorkPackage({ title: 'Test', sizeInPersonMonths: 1.0 });
+
+			const formData = new FormData();
+			formData.set('id', wp.id);
+			formData.set('progressPercent', '101');
+
+			const mockEvent = createMockRequest(formData);
+			const result = await actions.updateWorkPackage(mockEvent as Parameters<typeof actions.updateWorkPackage>[0]);
+
+			expect(result).toHaveProperty('status', 400);
+			expectErrorMessage(result, 'Invalid progress');
+		});
+
+		it('should return error when progress is negative', async () => {
+			const wp = await insertWorkPackage({ title: 'Test', sizeInPersonMonths: 1.0 });
+
+			const formData = new FormData();
+			formData.set('id', wp.id);
+			formData.set('progressPercent', '-5');
+
+			const mockEvent = createMockRequest(formData);
+			const result = await actions.updateWorkPackage(mockEvent as Parameters<typeof actions.updateWorkPackage>[0]);
+
+			expect(result).toHaveProperty('status', 400);
+			expectErrorMessage(result, 'Invalid progress');
+		});
+
+		it('should update progress to 100', async () => {
+			const wp = await insertWorkPackage({ title: 'Test', sizeInPersonMonths: 1.0 });
+
+			const formData = new FormData();
+			formData.set('id', wp.id);
+			formData.set('progressPercent', '100');
+
+			const mockEvent = createMockRequest(formData);
+			const result = await actions.updateWorkPackage(mockEvent as Parameters<typeof actions.updateWorkPackage>[0]);
+
+			expect(result).toEqual({ success: true });
+
+			const view = await load({} as Parameters<typeof load>[0]);
+			if (!view || !('initialState' in view)) {
+				throw new Error('Expected initialState in result');
+			}
+			const updatedWp = view.initialState.workPackages.find((w: WorkPackage) => w.id === wp.id);
+			expect(updatedWp?.progressPercent).toBe(100);
+		});
+
+		it('should clear description when empty string provided', async () => {
+			const wp = await insertWorkPackage({
+				title: 'Test',
+				sizeInPersonMonths: 1.0,
+				description: 'Original description'
+			});
+
+			const formData = new FormData();
+			formData.set('id', wp.id);
+			formData.set('description', '');
+
+			const mockEvent = createMockRequest(formData);
+			const result = await actions.updateWorkPackage(mockEvent as Parameters<typeof actions.updateWorkPackage>[0]);
+
+			expect(result).toEqual({ success: true });
+
+			const view = await load({} as Parameters<typeof load>[0]);
+			if (!view || !('initialState' in view)) {
+				throw new Error('Expected initialState in result');
+			}
+			const updatedWp = view.initialState.workPackages.find((w: WorkPackage) => w.id === wp.id);
+			expect(updatedWp?.description).toBeUndefined();
+		});
+	});
+
+	describe('createWorkPackage action - validation', () => {
+		it('should return error when title is whitespace only', async () => {
+			const formData = new FormData();
+			formData.set('id', crypto.randomUUID());
+			formData.set('title', '   ');
+			formData.set('sizeInPersonMonths', '2.0');
+
+			const mockEvent = createMockRequest(formData);
+			const result = await actions.createWorkPackage(mockEvent as Parameters<typeof actions.createWorkPackage>[0]);
+
+			expect(result).toHaveProperty('status', 400);
+			expectErrorMessage(result, 'Invalid title');
+		});
+
+		it('should return error when size is zero', async () => {
+			const formData = new FormData();
+			formData.set('id', crypto.randomUUID());
+			formData.set('title', 'Test');
+			formData.set('sizeInPersonMonths', '0');
+
+			const mockEvent = createMockRequest(formData);
+			const result = await actions.createWorkPackage(mockEvent as Parameters<typeof actions.createWorkPackage>[0]);
+
+			expect(result).toHaveProperty('status', 400);
+			expectErrorMessage(result, 'Invalid size');
+		});
+
+		it('should return error when size is negative', async () => {
+			const formData = new FormData();
+			formData.set('id', crypto.randomUUID());
+			formData.set('title', 'Test');
+			formData.set('sizeInPersonMonths', '-1');
+
+			const mockEvent = createMockRequest(formData);
+			const result = await actions.createWorkPackage(mockEvent as Parameters<typeof actions.createWorkPackage>[0]);
+
+			expect(result).toHaveProperty('status', 400);
+			expectErrorMessage(result, 'Invalid size');
+		});
+	});
+
+	describe('createTeam action - validation', () => {
+		it('should return error when name is whitespace only', async () => {
+			const formData = new FormData();
+			formData.set('id', crypto.randomUUID());
+			formData.set('name', '   ');
+			formData.set('monthlyCapacity', '5.0');
+
+			const mockEvent = createMockRequest(formData);
+			const result = await actions.createTeam(mockEvent as Parameters<typeof actions.createTeam>[0]);
+
+			expect(result).toHaveProperty('status', 400);
+			expectErrorMessage(result, 'Invalid name');
+		});
+
+		it('should return error when capacity is zero', async () => {
+			const formData = new FormData();
+			formData.set('id', crypto.randomUUID());
+			formData.set('name', 'Test Team');
+			formData.set('monthlyCapacity', '0');
+
+			const mockEvent = createMockRequest(formData);
+			const result = await actions.createTeam(mockEvent as Parameters<typeof actions.createTeam>[0]);
+
+			expect(result).toHaveProperty('status', 400);
+			expectErrorMessage(result, 'Invalid monthly capacity');
+		});
+
+		it('should return error when capacity is negative', async () => {
+			const formData = new FormData();
+			formData.set('id', crypto.randomUUID());
+			formData.set('name', 'Test Team');
+			formData.set('monthlyCapacity', '-5');
+
+			const mockEvent = createMockRequest(formData);
+			const result = await actions.createTeam(mockEvent as Parameters<typeof actions.createTeam>[0]);
+
+			expect(result).toHaveProperty('status', 400);
+			expectErrorMessage(result, 'Invalid monthly capacity');
+		});
+	});
+
+	describe('updateTeam action - validation', () => {
+		it('should return error when name is whitespace only', async () => {
+			const team = await insertTeam({ name: 'Original', monthlyCapacity: 3.0 });
+
+			const formData = new FormData();
+			formData.set('id', team.id);
+			formData.set('name', '   ');
+
+			const mockEvent = createMockRequest(formData);
+			const result = await actions.updateTeam(mockEvent as Parameters<typeof actions.updateTeam>[0]);
+
+			expect(result).toHaveProperty('status', 400);
+			expectErrorMessage(result, 'Invalid name');
+		});
+
+		it('should return error when capacity is zero', async () => {
+			const team = await insertTeam({ name: 'Original', monthlyCapacity: 3.0 });
+
+			const formData = new FormData();
+			formData.set('id', team.id);
+			formData.set('monthlyCapacity', '0');
+
+			const mockEvent = createMockRequest(formData);
+			const result = await actions.updateTeam(mockEvent as Parameters<typeof actions.updateTeam>[0]);
+
+			expect(result).toHaveProperty('status', 400);
+			expectErrorMessage(result, 'Invalid monthly capacity');
+		});
+
+		it('should return error when capacity is negative', async () => {
+			const team = await insertTeam({ name: 'Original', monthlyCapacity: 3.0 });
+
+			const formData = new FormData();
+			formData.set('id', team.id);
+			formData.set('monthlyCapacity', '-5');
+
+			const mockEvent = createMockRequest(formData);
+			const result = await actions.updateTeam(mockEvent as Parameters<typeof actions.updateTeam>[0]);
+
+			expect(result).toHaveProperty('status', 400);
+			expectErrorMessage(result, 'Invalid monthly capacity');
 		});
 	});
 });

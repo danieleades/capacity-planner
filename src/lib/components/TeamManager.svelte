@@ -8,7 +8,10 @@ import Modal from './Modal.svelte';
 import FormError from './FormError.svelte';
 import CapacitySparkline from './CapacitySparkline.svelte';
 import { getNextMonths, formatYearMonth } from '$lib/utils/dates';
-	import { generateId } from '$lib/utils/id';
+import { generateId } from '$lib/utils/id';
+
+// Configuration
+const COLUMN_WIDTH_PX = 100; // Width per month column
 
 	interface Props {
 		optimisticEnhance: OptimisticEnhanceAction<PlanningPageData>;
@@ -20,7 +23,10 @@ import { getNextMonths, formatYearMonth } from '$lib/utils/dates';
 const appState = getContext<ReturnType<typeof createAppStore>>('appState');
 const teams = getContext<Readable<Team[]>>('teams');
 
-	let showAddModal = $state(false);
+// Fixed capacity planning range - 12 months ahead
+const capacityMonths = getNextMonths(12);
+
+let showAddModal = $state(false);
 	let editingTeam = $state<string | null>(null);
 	let formName = $state('');
 	let formCapacity = $state(0);
@@ -178,58 +184,62 @@ function handleDelete(team: Team) {
 
 					<!-- Capacity Management Inline -->
 					<div class="border-t border-gray-200 pt-4">
-						<h4 class="mb-3 text-sm font-semibold text-gray-700">Monthly Capacity (next 6 months)</h4>
-						<div class="grid grid-cols-6 gap-3">
-							{#each getNextMonths(6) as yearMonth (yearMonth)}
-								{@const override = team.capacityOverrides?.find((co) => co.yearMonth === yearMonth)}
-								{@const capacity = override ? override.capacity : team.monthlyCapacityInPersonMonths}
-								<div class="space-y-1">
-									<label for="capacity-{team.id}-{yearMonth}" class="block text-xs font-medium text-gray-600">
-										{formatYearMonth(yearMonth)}
-									</label>
-									<form 
-										method="POST" 
-										action="?/updateCapacity"
-										data-client-action="update-capacity"
-										use:optimisticEnhance={(data, input) => {
-											// Optimistically update the capacity override
-											const teamId = input.formData.get('teamId') as string;
-											const yearMonth = input.formData.get('yearMonth') as string;
-											const newCapacity = parseFloat(input.formData.get('capacity') as string);
+						<h4 class="mb-3 text-sm font-semibold text-gray-700">
+							Monthly Capacity ({capacityMonths.length} months)
+						</h4>
+						<div class="overflow-x-auto">
+							<div class="flex gap-3" style="width: {capacityMonths.length * COLUMN_WIDTH_PX}px;">
+								{#each capacityMonths as yearMonth (yearMonth)}
+									{@const override = team.capacityOverrides?.find((co) => co.yearMonth === yearMonth)}
+									{@const capacity = override ? override.capacity : team.monthlyCapacityInPersonMonths}
+									<div class="space-y-1" style="width: {COLUMN_WIDTH_PX - 12}px; flex-shrink: 0;">
+										<label for="capacity-{team.id}-{yearMonth}" class="block text-xs font-medium text-gray-600">
+											{formatYearMonth(yearMonth)}
+										</label>
+										<form
+											method="POST"
+											action="?/updateCapacity"
+											data-client-action="update-capacity"
+											use:optimisticEnhance={(data, input) => {
+												// Optimistically update the capacity override
+												const teamId = input.formData.get('teamId') as string;
+												const yearMonth = input.formData.get('yearMonth') as string;
+												const newCapacity = parseFloat(input.formData.get('capacity') as string);
 
-											// Skip optimistic update if the parsed value is invalid
-											// This prevents NaN from being injected into the store
-											if (isNaN(newCapacity)) {
-												return;
-											}
+												// Skip optimistic update if the parsed value is invalid
+												// This prevents NaN from being injected into the store
+												if (isNaN(newCapacity)) {
+													return;
+												}
 
-											// Capture snapshot before optimistic update for rollback
-											const snapshots = getContext<Map<string, unknown>>('rollbackSnapshots');
-											const snapshotKey = `update-capacity-${teamId}-${yearMonth}`;
-											snapshots.set(snapshotKey, $appState);
+												// Capture snapshot before optimistic update for rollback
+												const snapshots = getContext<Map<string, unknown>>('rollbackSnapshots');
+												const snapshotKey = `update-capacity-${teamId}-${yearMonth}`;
+												snapshots.set(snapshotKey, $appState);
 
-											// Use store operation (auto-removes override if it matches default)
-											appState.setMonthlyCapacity(teamId, yearMonth, newCapacity);
-										}}
-									>
-										<input type="hidden" name="teamId" value={team.id} />
-										<input type="hidden" name="yearMonth" value={yearMonth} />
-										<input
-											id="capacity-{team.id}-{yearMonth}"
-											name="capacity"
-											type="number"
-											step="0.1"
-											min="0"
-											value={capacity}
-											onchange={(e) => {
-												// Submit the form (optimistic update will happen automatically)
-												e.currentTarget.form?.requestSubmit();
+												// Use store operation (auto-removes override if it matches default)
+												appState.setMonthlyCapacity(teamId, yearMonth, newCapacity);
 											}}
-											class="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-										/>
-									</form>
-								</div>
-							{/each}
+										>
+											<input type="hidden" name="teamId" value={team.id} />
+											<input type="hidden" name="yearMonth" value={yearMonth} />
+											<input
+												id="capacity-{team.id}-{yearMonth}"
+												name="capacity"
+												type="number"
+												step="0.1"
+												min="0"
+												value={capacity}
+												onchange={(e) => {
+													// Submit the form (optimistic update will happen automatically)
+													e.currentTarget.form?.requestSubmit();
+												}}
+												class="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+											/>
+										</form>
+									</div>
+								{/each}
+							</div>
 						</div>
 					</div>
 				</div>

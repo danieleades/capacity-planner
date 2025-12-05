@@ -9,13 +9,14 @@ import type { ActionResult } from '@sveltejs/kit';
 	import TeamManager from '$lib/components/TeamManager.svelte';
 	import KanbanBoard from '$lib/components/KanbanBoard.svelte';
 	import WorkPackagesTable from '$lib/components/WorkPackagesTable.svelte';
+	import GanttChart from '$lib/components/GanttChart.svelte';
 	import ErrorBanner from '$lib/components/ErrorBanner.svelte';
 	import { createAppStore, createDerivedStores } from '$lib/stores/appState';
 
 	// Use $props to get page data instead of $page store
 	const { data }: { data: PageData } = $props();
 
-	let activeTab = $state<'board' | 'workPackages' | 'teams'>('board');
+	let activeTab = $state<'board' | 'workPackages' | 'teams' | 'gantt'>('board');
 	let errorMessage = $state<string>('');
 	let lastFailedAction = $state<(() => void) | null>(null);
 
@@ -251,6 +252,14 @@ import type { ActionResult } from '@sveltejs/kit';
 					>
 						Teams
 					</button>
+					<button
+						onclick={() => (activeTab = 'gantt')}
+						class="whitespace-nowrap border-b-2 px-1 py-2 text-sm font-medium {activeTab === 'gantt'
+							? 'border-blue-500 text-blue-600'
+							: 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'}"
+					>
+						Timeline
+					</button>
 				</nav>
 			</div>
 		</div>
@@ -261,8 +270,10 @@ import type { ActionResult } from '@sveltejs/kit';
 			<KanbanBoard optimisticEnhance={optimisticEnhance} />
 		{:else if activeTab === 'workPackages'}
 			<WorkPackagesTable optimisticEnhance={optimisticEnhance} />
-		{:else}
+		{:else if activeTab === 'teams'}
 			<TeamManager optimisticEnhance={optimisticEnhance} />
+		{:else if activeTab === 'gantt'}
+			<GanttChart />
 		{/if}
 	</main>
 </div>

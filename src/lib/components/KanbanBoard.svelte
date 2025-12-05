@@ -9,6 +9,8 @@
 		formatDate,
 		getRemainingWork,
 		calculateCardHeight,
+		sortByScheduledPosition,
+		groupWorkPackagesByTeam,
 		type TeamBacklogMetrics,
 	} from '$lib/utils/capacity';
 	import type { WorkPackage, Team, PlanningPageData } from '$lib/types';
@@ -69,41 +71,23 @@
 	}
 
 	// Helper function to build columns from store data
-	// Sort by scheduledPosition (for board planning) with fallback to priority
-	// 
 	// Performance optimization: Pre-groups work packages by team in O(n) time,
 	// then passes pre-filtered arrays to calculateTeamBacklog to avoid redundant
 	// O(n) filtering per team. This reduces complexity from O(teams × packages) to O(packages).
 	function buildColumns(): Column[] {
-		const sortByScheduledPosition = (items: WorkPackage[]) =>
-			items.sort((a, b) => {
-				const posA = a.scheduledPosition ?? a.priority;
-				const posB = b.scheduledPosition ?? b.priority;
-				return posA - posB;
-			});
-
-		// Pre-group work packages by team (O(n) instead of O(teams × packages))
-		// eslint-disable-next-line svelte/prefer-svelte-reactivity
-		const workPackagesByTeam = new Map<string | undefined, WorkPackage[]>();
-		for (const wp of $appState.workPackages) {
-			const teamId = wp.assignedTeamId;
-			if (!workPackagesByTeam.has(teamId)) {
-				workPackagesByTeam.set(teamId, []);
-			}
-			workPackagesByTeam.get(teamId)!.push(wp);
-		}
+		const { byTeam, unassigned } = groupWorkPackagesByTeam($appState.workPackages);
 
 		const cols: Column[] = [
 			{
 				id: 'unassigned',
 				title: 'Unassigned',
-				items: sortByScheduledPosition([...(workPackagesByTeam.get(undefined) || [])]),
+				items: sortByScheduledPosition(unassigned),
 				capacity: null,
 			},
 		];
 
 		for (const team of $teams) {
-			const teamWPs = workPackagesByTeam.get(team.id) || [];
+			const teamWPs = byTeam.get(team.id) || [];
 			// Pass preFiltered=true since teamWPs is already filtered for this team
 			// This avoids redundant O(n) filtering inside calculateTeamBacklog
 			const metrics = calculateTeamBacklog(team, teamWPs, true);
@@ -112,7 +96,7 @@
 				id: team.id,
 				title: team.name,
 				team, // Include team object for sparkline
-				items: sortByScheduledPosition([...teamWPs]),
+				items: sortByScheduledPosition(teamWPs),
 				capacity: {
 					monthlyCapacity: team.monthlyCapacityInPersonMonths,
 					...metrics,
@@ -211,6 +195,33 @@
 		submitBatchReorder(persistedUpdates, snapshot);
 	}
 
+	// Centralized error handler for fetch operations with rollback support
+	function handleFetchError(
+		error: unknown,
+		defaultMessage: string,
+		snapshot: typeof $appState,
+		retry?: () => void
+	) {
+		const errorMsg =
+			error instanceof Error
+				? error.message
+				: typeof error === 'object' && error !== null && 'data' in error
+					? ((error as { data?: { details?: string; error?: string } }).data?.details ||
+						(error as { data?: { details?: string; error?: string } }).data?.error ||
+						defaultMessage)
+					: defaultMessage;
+
+		console.error(defaultMessage, errorMsg);
+		appState.set(snapshot);
+
+		const windowWithHandler = window as Window & {
+			handleFormError?: (msg: string, retry?: () => void) => void;
+		};
+		if (typeof window !== 'undefined' && windowWithHandler.handleFormError) {
+			windowWithHandler.handleFormError(errorMsg, retry);
+		}
+	}
+
 	// Helper function to submit batch reorder to server
 	async function submitBatchReorder(
 		updates: Array<{ id: string; teamId: string | null; position: number }>,
@@ -227,47 +238,22 @@
 
 			const result = await response.json();
 
-			// Check HTTP status code first, then result type
 			if (!response.ok || result.type === 'failure') {
-				const errorMsg = result.data?.details || result.data?.error || 'Failed to reorder work packages';
-				console.error('Failed to reorder work packages:', errorMsg);
-
-				// Rollback to snapshot
-				appState.set(snapshot);
-
-				// Show error message to user with retry functionality
-				const windowWithHandler = window as Window & { handleFormError?: (msg: string, retry?: () => void) => void };
-				if (typeof window !== 'undefined' && windowWithHandler.handleFormError) {
-					windowWithHandler.handleFormError(errorMsg, () => {
-						submitBatchReorder(updates, snapshot);
-					});
-				}
+				handleFetchError(result, 'Failed to reorder work packages', snapshot, () =>
+					submitBatchReorder(updates, snapshot)
+				);
 			}
 		} catch (error) {
-			const errorMsg = error instanceof Error ? error.message : 'Failed to reorder work packages';
-			console.error('Failed to reorder work packages:', errorMsg);
-
-			// Rollback to snapshot
-			appState.set(snapshot);
-
-			// Show error message to user with retry functionality
-			const windowWithHandler = window as Window & { handleFormError?: (msg: string, retry?: () => void) => void };
-			if (typeof window !== 'undefined' && windowWithHandler.handleFormError) {
-				windowWithHandler.handleFormError(errorMsg, () => {
-					submitBatchReorder(updates, snapshot);
-				});
-			}
+			handleFetchError(error, 'Failed to reorder work packages', snapshot, () =>
+				submitBatchReorder(updates, snapshot)
+			);
 		}
 	}
 
 	async function reorderByPriority() {
-		// Capture snapshot before optimistic update for rollback
 		const snapshot = $appState;
-
-		// Optimistically clear scheduledPosition for unassigned work packages
 		appState.clearUnassignedScheduledPositions();
 
-		// Persist to server using dedicated action
 		try {
 			const response = await fetch('?/clearUnassignedPositions', {
 				method: 'POST',
@@ -276,32 +262,11 @@
 
 			const result = await response.json();
 
-			// Check HTTP status code first, then result type
 			if (!response.ok || result.type === 'failure') {
-				const errorMsg = result.data?.details || result.data?.error || 'Failed to reset to priority order';
-				console.error('Failed to reset to priority order:', errorMsg);
-
-				// Rollback to snapshot
-				appState.set(snapshot);
-
-				// Show error message to user with retry functionality
-				const windowWithHandler = window as Window & { handleFormError?: (msg: string, retry?: () => void) => void };
-				if (typeof window !== 'undefined' && windowWithHandler.handleFormError) {
-					windowWithHandler.handleFormError(errorMsg, reorderByPriority);
-				}
+				handleFetchError(result, 'Failed to reset to priority order', snapshot, reorderByPriority);
 			}
 		} catch (error) {
-			const errorMsg = error instanceof Error ? error.message : 'Failed to reset to priority order';
-			console.error('Failed to reset to priority order:', errorMsg);
-
-			// Rollback to snapshot
-			appState.set(snapshot);
-
-			// Show error message to user with retry functionality
-			const windowWithHandler = window as Window & { handleFormError?: (msg: string, retry?: () => void) => void };
-			if (typeof window !== 'undefined' && windowWithHandler.handleFormError) {
-				windowWithHandler.handleFormError(errorMsg, reorderByPriority);
-			}
+			handleFetchError(error, 'Failed to reset to priority order', snapshot, reorderByPriority);
 		}
 	}
 </script>
