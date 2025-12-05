@@ -144,7 +144,7 @@ describe('WorkPackagesTable', () => {
 			expect(screen.getByText('—')).toBeInTheDocument();
 		});
 
-		it('should display 0% progress when progressPercent is undefined', () => {
+		it('should display 0% progress when progressPercent is 0', () => {
 			renderWorkPackagesTable({
 				teams: [],
 				workPackages: [
@@ -153,6 +153,7 @@ describe('WorkPackagesTable', () => {
 						title: 'Feature A',
 						sizeInPersonMonths: 2,
 						priority: 0,
+						progressPercent: 0,
 						scheduledPosition: 0
 					}
 				]

@@ -359,8 +359,8 @@ describe('GanttChart', () => {
 	});
 
 	describe('dynamic timeline', () => {
-		it('should extend timeline to accommodate long schedules', () => {
-			const { container } = renderGanttChart({
+			it('should extend timeline to accommodate long schedules', () => {
+				renderGanttChart({
 				teams: [
 					{
 						id: 'team-1',

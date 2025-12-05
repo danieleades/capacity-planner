@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
+import { pathToFileURL } from 'url';
 import { teams, capacityOverrides, workPackages } from '../src/lib/server/schema.js';
 
 /**
@@ -17,15 +18,19 @@ function getDatabasePath(): string {
 /**
  * Initialize database connection for seed script
  */
-const sqlite = new Database(getDatabasePath());
-sqlite.pragma('journal_mode = WAL');
-const db = drizzle(sqlite);
+function createDb() {
+	const sqlite = new Database(getDatabasePath());
+	sqlite.pragma('journal_mode = WAL');
+	return { sqlite, db: drizzle(sqlite) };
+}
 
 /**
- * Seed script for populating the database with demo data
- * This script clears all existing data and inserts fresh demo data
+ * Seed script for populating the database with demo data.
+ * Creates a fresh connection so it can be reused in tests.
  */
-function seed() {
+export function seed() {
+	const { sqlite, db } = createDb();
+
 	console.log('🌱 Starting database seed...');
 
 	try {
@@ -159,11 +164,14 @@ function seed() {
 	}
 }
 
-// Run the seed function
-try {
-	seed();
-	process.exit(0);
-} catch (error) {
-	console.error('❌ Unexpected error:', error);
-	process.exit(1);
+const isMain = import.meta.url === pathToFileURL(process.argv[1] ?? '').href;
+
+if (isMain) {
+	try {
+		seed();
+		process.exit(0);
+	} catch (error) {
+		console.error('❌ Unexpected error:', error);
+		process.exit(1);
+	}
 }

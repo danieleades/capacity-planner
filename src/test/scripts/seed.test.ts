@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { execSync } from 'child_process';
 import { existsSync, unlinkSync, mkdtempSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { teams, capacityOverrides, workPackages } from '$lib/server/schema';
+import { seed } from '../../../scripts/seed.ts';
 
 describe('Seed Script', () => {
 	let testDir: string;
@@ -32,11 +32,18 @@ describe('Seed Script', () => {
 	});
 
 	it('should populate the database with demo data', () => {
-		// Execute the seed script with a test database
-		execSync('tsx scripts/seed.ts', {
-			env: { ...process.env, DATA_DIR: testDir },
-			stdio: 'pipe'
-		});
+		const originalDataDir = process.env.DATA_DIR;
+		process.env.DATA_DIR = testDir;
+
+		try {
+			seed();
+		} finally {
+			if (originalDataDir === undefined) {
+				delete process.env.DATA_DIR;
+			} else {
+				process.env.DATA_DIR = originalDataDir;
+			}
+		}
 
 		// Open the test database and verify data
 		const sqlite = new Database(testDbPath);
