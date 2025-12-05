@@ -5,7 +5,7 @@
 	import { enhance as svelteKitEnhance } from '$app/forms';
 	import { SvelteMap } from 'svelte/reactivity';
 	import type { PageData } from './$types';
-import type { ActionResult } from '@sveltejs/kit';
+	import type { ActionResult } from '@sveltejs/kit';
 	import TeamManager from '$lib/components/TeamManager.svelte';
 	import KanbanBoard from '$lib/components/KanbanBoard.svelte';
 	import WorkPackagesTable from '$lib/components/WorkPackagesTable.svelte';
@@ -13,8 +13,7 @@ import type { ActionResult } from '@sveltejs/kit';
 	import ErrorBanner from '$lib/components/ErrorBanner.svelte';
 	import { createAppStore, createDerivedStores } from '$lib/stores/appState';
 
-	// Get page data as props - data.initialState seeds the store once,
-	// while data itself stays reactive for optimistikit
+	// Get page data as props - data stays reactive for optimistikit
 	const { data }: { data: PageData } = $props();
 
 	let activeTab = $state<'board' | 'workPackages' | 'teams' | 'gantt'>('board');
@@ -25,9 +24,11 @@ import type { ActionResult } from '@sveltejs/kit';
 	// Maps form submission ID to snapshot of state before optimistic update
 	const rollbackSnapshots = new SvelteMap<string, unknown>();
 
-	// Create per-request store instance (seeded once from server, then managed client-side)
-	// eslint-disable-next-line svelte/state-referenced-locally
-	const appState = createAppStore(data.initialState);
+	// Create per-request store instance and keep it aligned with server data updates
+	const appState = createAppStore();
+	$effect(() => {
+		appState.set(data.initialState);
+	});
 	const { teams, workPackages, unassignedWorkPackages } = createDerivedStores(appState);
 
 	// Make stores available to child components via context
