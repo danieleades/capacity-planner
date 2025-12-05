@@ -13,7 +13,8 @@ import type { ActionResult } from '@sveltejs/kit';
 	import ErrorBanner from '$lib/components/ErrorBanner.svelte';
 	import { createAppStore, createDerivedStores } from '$lib/stores/appState';
 
-	// Use $props to get page data instead of $page store
+	// Get page data as props - data.initialState seeds the store once,
+	// while data itself stays reactive for optimistikit
 	const { data }: { data: PageData } = $props();
 
 	let activeTab = $state<'board' | 'workPackages' | 'teams' | 'gantt'>('board');
@@ -24,7 +25,8 @@ import type { ActionResult } from '@sveltejs/kit';
 	// Maps form submission ID to snapshot of state before optimistic update
 	const rollbackSnapshots = new SvelteMap<string, unknown>();
 
-	// Create per-request store instance
+	// Create per-request store instance (seeded once from server, then managed client-side)
+	// eslint-disable-next-line svelte/state-referenced-locally
 	const appState = createAppStore(data.initialState);
 	const { teams, workPackages, unassignedWorkPackages } = createDerivedStores(appState);
 

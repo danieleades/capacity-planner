@@ -29,8 +29,8 @@ export default defineConfig({
 	},
 	resolve: {
 		alias: {
-			$lib: resolve(__dirname, './src/lib'),
-			$app: resolve(__dirname, './src/test/mocks/app'),
+			$lib: resolve(import.meta.dirname, './src/lib'),
+			$app: resolve(import.meta.dirname, './src/test/mocks/app'),
 		},
 	},
 });
