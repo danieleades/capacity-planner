@@ -53,6 +53,6 @@
 		"drizzle-orm": "^0.45.1",
 		"optimistikit": "^1.0.2",
 		"svelte-dnd-action": "^0.9.67",
-		"zod": "^4.1.12"
+		"zod": "^4.3.5"
 	}
 }
