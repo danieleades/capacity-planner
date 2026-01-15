@@ -52,7 +52,7 @@
 		"better-sqlite3": "^12.6.0",
 		"drizzle-orm": "^0.45.1",
 		"optimistikit": "^1.0.2",
-		"svelte-dnd-action": "^0.9.67",
+		"svelte-dnd-action": "^0.9.69",
 		"zod": "^4.3.5"
 	}
 }
