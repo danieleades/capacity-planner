@@ -21,7 +21,7 @@
 		"reset-demo": "tsx scripts/migrate.ts && tsx scripts/seed.ts"
 	},
 	"devDependencies": {
-		"@eslint/js": "^9.39.1",
+		"@eslint/js": "^9.39.2",
 		"@sveltejs/adapter-node": "^5.5.1",
 		"@sveltejs/kit": "^2.49.5",
 		"@sveltejs/vite-plugin-svelte": "^6.2.1",
