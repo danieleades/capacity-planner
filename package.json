@@ -33,7 +33,7 @@
 		"@vitest/coverage-v8": "^4.0.17",
 		"@vitest/ui": "^4.0.8",
 		"drizzle-kit": "^0.31.7",
-		"eslint": "^9.39.1",
+		"eslint": "^9.39.2",
 		"eslint-plugin-svelte": "^3.14.0",
 		"globals": "^17.0.0",
 		"jsdom": "^27.4.0",
