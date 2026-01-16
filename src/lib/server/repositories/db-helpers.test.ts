@@ -56,13 +56,15 @@ describe('db-helpers', () => {
 		});
 
 		it('should preserve custom validation errors', () => {
-			const customError = new Error('Validation failed for create team: name is required, capacity must be positive');
+			const customError = new Error(
+				'Validation failed for create team: name is required, capacity must be non-negative'
+			);
 
 			expect(() => {
 				dbOperation(() => {
 					throw customError;
 				}, 'Failed to create team');
-			}).toThrow('Validation failed for create team: name is required, capacity must be positive');
+			}).toThrow('Validation failed for create team: name is required, capacity must be non-negative');
 		});
 	});
 

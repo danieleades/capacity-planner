@@ -1419,7 +1419,7 @@ describe('Planning Page Routes', () => {
 			expectErrorMessage(result, 'Invalid name');
 		});
 
-		it('should return error when capacity is zero', async () => {
+		it('should allow capacity to be zero', async () => {
 			const formData = new FormData();
 			formData.set('id', crypto.randomUUID());
 			formData.set('name', 'Test Team');
@@ -1428,8 +1428,13 @@ describe('Planning Page Routes', () => {
 			const mockEvent = createMockRequest(formData);
 			const result = await actions.createTeam(mockEvent as Parameters<typeof actions.createTeam>[0]);
 
-			expect(result).toHaveProperty('status', 400);
-			expectErrorMessage(result, 'Invalid monthly capacity');
+			expect(result).toHaveProperty('success', true);
+
+			const view = await load({} as Parameters<typeof load>[0]);
+			if (!view || !('initialState' in view)) {
+				throw new Error('Expected initialState in result');
+			}
+			expect(view.initialState.teams[0].monthlyCapacityInPersonMonths).toBe(0);
 		});
 
 		it('should return error when capacity is negative', async () => {
@@ -1461,7 +1466,7 @@ describe('Planning Page Routes', () => {
 			expectErrorMessage(result, 'Invalid name');
 		});
 
-		it('should return error when capacity is zero', async () => {
+		it('should allow capacity to be zero', async () => {
 			const team = await insertTeam({ name: 'Original', monthlyCapacity: 3.0 });
 
 			const formData = new FormData();
@@ -1471,8 +1476,13 @@ describe('Planning Page Routes', () => {
 			const mockEvent = createMockRequest(formData);
 			const result = await actions.updateTeam(mockEvent as Parameters<typeof actions.updateTeam>[0]);
 
-			expect(result).toHaveProperty('status', 400);
-			expectErrorMessage(result, 'Invalid monthly capacity');
+			expect(result).toEqual({ success: true });
+
+			const view = await load({} as Parameters<typeof load>[0]);
+			if (!view || !('initialState' in view)) {
+				throw new Error('Expected initialState in result');
+			}
+			expect(view.initialState.teams[0].monthlyCapacityInPersonMonths).toBe(0);
 		});
 
 		it('should return error when capacity is negative', async () => {

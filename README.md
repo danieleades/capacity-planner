@@ -8,6 +8,20 @@ SvelteKit app for interactive capacity planning.
 npm install
 ```
 
+## Database location
+
+By default the app uses `./sqlite.db`. You can override the path:
+
+- `DB_PATH=/path/to/db.sqlite` for a direct file path
+- `DATA_DIR=/path/to/dir` to use `/path/to/dir/sqlite.db`
+
+Examples:
+
+```sh
+DB_PATH=./dev-data/dev.sqlite npm run dev
+DATA_DIR=./prod-data npm run build && DATA_DIR=./prod-data node build
+```
+
 ## Scripts
 
 - `npm run dev` – start the dev server

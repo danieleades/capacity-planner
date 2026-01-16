@@ -5,19 +5,24 @@ import { dev } from '$app/environment';
 
 /**
  * Get the database file path based on environment
- * In development: use local sqlite.db file
- * In production: use DATA_DIR environment variable or fallback to local
+ * Use DB_PATH for a direct file override, or DATA_DIR to choose a directory
+ * Defaults to local sqlite.db in both dev and prod
  */
 function getDatabasePath(): string {
-	if (dev) {
-		return 'sqlite.db';
+	const dbPath = process.env.DB_PATH;
+	if (dbPath) {
+		return dbPath;
 	}
-	
+
 	const dataDir = process.env.DATA_DIR;
 	if (dataDir) {
 		return `${dataDir}/sqlite.db`;
 	}
-	
+
+	if (dev) {
+		return 'sqlite.db';
+	}
+
 	return 'sqlite.db';
 }
 

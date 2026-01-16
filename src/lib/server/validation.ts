@@ -5,6 +5,7 @@ import { z } from 'zod';
  */
 const yearMonth = z.string().regex(/^\d{4}-\d{2}$/);
 const positiveNumber = z.number().positive();
+const nonNegativeNumber = z.number().nonnegative();
 const nonNegativeInt = z.number().int().nonnegative();
 
 /**
@@ -13,7 +14,7 @@ const nonNegativeInt = z.number().int().nonnegative();
 export const createTeamSchema = z.object({
 	id: z.uuid(),
 	name: z.string().min(1).max(100),
-	monthlyCapacity: positiveNumber
+	monthlyCapacity: nonNegativeNumber
 });
 
 /**
@@ -21,7 +22,7 @@ export const createTeamSchema = z.object({
  */
 export const updateTeamSchema = z.object({
 	name: z.string().min(1).max(100).optional(),
-	monthlyCapacity: positiveNumber.optional()
+	monthlyCapacity: nonNegativeNumber.optional()
 });
 
 /**

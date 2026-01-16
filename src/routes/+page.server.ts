@@ -369,10 +369,10 @@ export const actions: Actions = {
 			}
 
 			const monthlyCapacity = parseFloat(monthlyCapacityStr);
-			if (isNaN(monthlyCapacity) || monthlyCapacity <= 0) {
+			if (isNaN(monthlyCapacity) || monthlyCapacity < 0) {
 				return fail(400, {
 					error: 'Invalid monthly capacity',
-					details: 'Monthly capacity must be a positive number'
+					details: 'Monthly capacity must be a non-negative number'
 				});
 			}
 
@@ -439,10 +439,10 @@ export const actions: Actions = {
 			const monthlyCapacityStr = data.get('monthlyCapacity') as string | null;
 			if (monthlyCapacityStr !== null) {
 				const monthlyCapacity = parseFloat(monthlyCapacityStr);
-				if (isNaN(monthlyCapacity) || monthlyCapacity <= 0) {
+				if (isNaN(monthlyCapacity) || monthlyCapacity < 0) {
 					return fail(400, {
 						error: 'Invalid monthly capacity',
-						details: 'Monthly capacity must be a positive number'
+						details: 'Monthly capacity must be a non-negative number'
 					});
 				}
 				updateData.monthlyCapacity = monthlyCapacity;
