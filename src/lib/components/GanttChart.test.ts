@@ -26,7 +26,9 @@ describe('GanttChart', () => {
 	function renderGanttChart(state: AppState = initialState) {
 		const appState = createAppStore(state);
 		const { teams } = createDerivedStores(appState);
+		const planningStartDate = new Date();
 		return render(GanttChart, {
+			props: { planningStartDate },
 			context: new Map<string, unknown>([
 				['appState', appState],
 				['teams', teams]
@@ -115,7 +117,7 @@ describe('GanttChart', () => {
 			expect(screen.getByText(/Mar 2025/)).toBeInTheDocument();
 		});
 
-		it('should highlight current month in header', () => {
+		it('should highlight planning start month in header', () => {
 			const { container } = renderGanttChart({
 				teams: [
 					{
@@ -138,7 +140,7 @@ describe('GanttChart', () => {
 				]
 			});
 
-			// Current month should have special styling
+			// Planning start month should have special styling
 			const currentMonthHeader = container.querySelector('.bg-blue-50.text-blue-700');
 			expect(currentMonthHeader).toBeInTheDocument();
 			expect(currentMonthHeader?.textContent).toMatch(/Jan 2025/);
@@ -416,7 +418,7 @@ describe('GanttChart', () => {
 	});
 
 	describe('legend', () => {
-		it('should show current month indicator in legend', () => {
+		it('should show planning start indicator in legend', () => {
 			renderGanttChart({
 				teams: [
 					{
@@ -439,7 +441,7 @@ describe('GanttChart', () => {
 				]
 			});
 
-			expect(screen.getByText('Current month')).toBeInTheDocument();
+			expect(screen.getByText('Planning start')).toBeInTheDocument();
 		});
 
 		it('should show team colors in legend', () => {

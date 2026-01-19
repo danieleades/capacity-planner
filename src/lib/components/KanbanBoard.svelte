@@ -1,10 +1,12 @@
 <script lang="ts">
 	import { getContext } from 'svelte';
 	import type { Readable } from 'svelte/store';
+	import { SvelteMap } from 'svelte/reactivity';
 	import { dndzone } from 'svelte-dnd-action';
 	import { createAppStore } from '$lib/stores/appState';
 	import {
 		calculateTeamBacklog,
+		calculateTeamSchedule,
 		formatMonths,
 		formatDate,
 		getRemainingWork,
@@ -12,17 +14,19 @@
 		sortByScheduledPosition,
 		groupWorkPackagesByTeam,
 		type TeamBacklogMetrics,
+		type ScheduledWorkPackage,
 	} from '$lib/utils/capacity';
-	import type { WorkPackage, Team, PlanningPageData } from '$lib/types';
+	import { YearMonth, type WorkPackage, type Team, type PlanningPageData } from '$lib/types';
 	import type { OptimisticEnhanceAction } from '$lib/types/optimistic';
 	import CapacitySparkline from './CapacitySparkline.svelte';
 	import WorkPackageModal from './WorkPackageModal.svelte';
 
 	interface Props {
 		optimisticEnhance: OptimisticEnhanceAction<PlanningPageData>;
+		planningStartDate: Date;
 	}
 
-	let { optimisticEnhance }: Props = $props();
+	let { optimisticEnhance, planningStartDate }: Props = $props();
 
 	// Get stores from context
 	const appState = getContext<ReturnType<typeof createAppStore>>('appState');
@@ -90,7 +94,7 @@
 			const teamWPs = byTeam.get(team.id) || [];
 			// Pass preFiltered=true since teamWPs is already filtered for this team
 			// This avoids redundant O(n) filtering inside calculateTeamBacklog
-			const metrics = calculateTeamBacklog(team, teamWPs, true);
+			const metrics = calculateTeamBacklog(team, teamWPs, true, planningStartDate);
 
 			cols.push({
 				id: team.id,
@@ -123,6 +127,20 @@
 	const globalMaxRemainingWork = $derived(
 		$appState.workPackages.reduce((max, wp) => Math.max(max, getRemainingWork(wp)), 0)
 	);
+
+	// Create a lookup map from work package ID to its scheduled dates
+	// This allows O(1) lookup when rendering cards
+	const scheduleLookup = $derived.by(() => {
+		const lookup = new SvelteMap<string, ScheduledWorkPackage>();
+		for (const team of $teams) {
+			const teamWPs = $appState.workPackages.filter((wp) => wp.assignedTeamId === team.id);
+			const schedule = calculateTeamSchedule(team, teamWPs, planningStartDate);
+			for (const swp of schedule) {
+				lookup.set(swp.workPackage.id, swp);
+			}
+		}
+		return lookup;
+	});
 
 	function handleDndConsider(columnId: string, e: CustomEvent) {
 		// Update local state during drag for visual feedback
@@ -381,6 +399,7 @@
 						{@const cardHeight = sizeScalingIntensity > 0
 							? calculateCardHeight(getRemainingWork(wp), globalMaxRemainingWork, sizeScalingIntensity)
 							: null}
+						{@const swp = scheduleLookup.get(wp.id)}
 						<div
 							class="mb-2 cursor-move rounded border border-gray-300 bg-white p-3 shadow-sm transition-all duration-200"
 							style={cardHeight ? `min-height: ${cardHeight}px` : ''}
@@ -395,6 +414,17 @@
 								</span>
 								<span class="text-gray-400">Priority: {wp.priority + 1}</span>
 							</div>
+							{#if swp}
+								{@const startYM = YearMonth.fromDate(swp.startDate)}
+								{@const endYM = YearMonth.fromDate(swp.endDate)}
+								<div class="mt-2 text-xs text-gray-500">
+									{#if startYM.toString() === endYM.toString()}
+										{startYM.format()}
+									{:else}
+										{startYM.format()} → {endYM.format()}
+									{/if}
+								</div>
+							{/if}
 							{#if (wp.progressPercent ?? 0) > 0}
 								<div class="mt-2">
 									<div class="flex items-center justify-between text-xs text-gray-500">

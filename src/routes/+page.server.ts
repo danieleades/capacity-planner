@@ -1,7 +1,7 @@
 import type { PageServerLoad, Actions } from './$types';
 import { fail } from '@sveltejs/kit';
 import { ZodError } from 'zod';
-import { getPlanningView } from '$lib/server/repositories/planning.repository';
+import { getPlanningView, getPlanningStartDate, setPlanningStartDate } from '$lib/server/repositories/planning.repository';
 import {
 	createWorkPackage,
 	updateWorkPackage,
@@ -49,10 +49,28 @@ function isPrimaryKeyViolation(error: unknown): boolean {
 	return false;
 }
 
+/**
+ * Parse a YYYY-MM-DD string into a Date object
+ */
+function parseDateString(dateStr: string): Date {
+	const [year, month, day] = dateStr.split('-').map(Number);
+	return new Date(year, month - 1, day);
+}
+
+/**
+ * Get today's date at midnight (local time)
+ */
+function getTodayDate(): Date {
+	const now = new Date();
+	return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+}
+
 export const load: PageServerLoad = async () => {
 	try {
 		const planningView = getPlanningView();
-		
+		const storedDateStr = getPlanningStartDate();
+		const planningStartDate = storedDateStr ? parseDateString(storedDateStr) : getTodayDate();
+
 		// Transform PlanningView into AppState format (flat arrays)
 		// Flatten work packages from all teams and unassigned into a single array
 		const allWorkPackages = [
@@ -95,7 +113,8 @@ export const load: PageServerLoad = async () => {
 			initialState: {
 				teams: allTeams,
 				workPackages: allWorkPackages
-			}
+			},
+			planningStartDate
 		};
 	} catch (error) {
 		console.error('Failed to load planning view:', error);
@@ -553,6 +572,46 @@ export const actions: Actions = {
 			console.error('Failed to clear unassigned positions:', error);
 			return fail(500, {
 				error: 'Failed to reset to priority order',
+				details: formatErrorMessage(error)
+			});
+		}
+	},
+
+	updatePlanningStartDate: async ({ request }) => {
+		try {
+			const data = await request.formData();
+			const dateStr = data.get('date') as string;
+
+			if (!dateStr) {
+				return fail(400, {
+					error: 'Missing date',
+					details: 'Date is required'
+				});
+			}
+
+			// Validate date format (YYYY-MM-DD)
+			if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+				return fail(400, {
+					error: 'Invalid date format',
+					details: 'Date must be in YYYY-MM-DD format'
+				});
+			}
+
+			// Validate it's a valid date
+			const parsed = new Date(dateStr + 'T00:00:00');
+			if (isNaN(parsed.getTime())) {
+				return fail(400, {
+					error: 'Invalid date',
+					details: 'The provided date is not valid'
+				});
+			}
+
+			setPlanningStartDate(dateStr);
+			return { success: true };
+		} catch (error) {
+			console.error('Failed to update planning start date:', error);
+			return fail(500, {
+				error: 'Failed to update planning start date',
 				details: formatErrorMessage(error)
 			});
 		}

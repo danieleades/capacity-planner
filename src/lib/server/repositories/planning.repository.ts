@@ -1,7 +1,8 @@
 import { db as defaultDb } from '../db';
-import { teams, capacityOverrides, workPackages } from '../schema';
+import { teams, capacityOverrides, workPackages, settings } from '../schema';
 import type { DbParam } from './types';
 import { dbOperation } from './db-helpers';
+import { eq } from 'drizzle-orm';
 
 /**
  * Domain model interfaces for planning view
@@ -128,4 +129,45 @@ export function getPlanningView(db: DbParam = defaultDb): PlanningView {
 			unassignedWorkPackages
 		};
 	}, 'Failed to get planning view');
+}
+
+const PLANNING_START_DATE_KEY = 'planning_start_date';
+
+/**
+ * Get the planning start date from settings
+ * Returns the stored date string in YYYY-MM-DD format, or null if not set
+ */
+export function getPlanningStartDate(db: DbParam = defaultDb): string | null {
+	return dbOperation(() => {
+		const result = db
+			.select({ value: settings.value })
+			.from(settings)
+			.where(eq(settings.key, PLANNING_START_DATE_KEY))
+			.get();
+		return result?.value ?? null;
+	}, 'Failed to get planning start date');
+}
+
+/**
+ * Set the planning start date in settings
+ * @param dateStr - Date string in YYYY-MM-DD format
+ */
+export function setPlanningStartDate(dateStr: string, db: DbParam = defaultDb): void {
+	dbOperation(() => {
+		const now = new Date();
+		db.insert(settings)
+			.values({
+				key: PLANNING_START_DATE_KEY,
+				value: dateStr,
+				updatedAt: now
+			})
+			.onConflictDoUpdate({
+				target: settings.key,
+				set: {
+					value: dateStr,
+					updatedAt: now
+				}
+			})
+			.run();
+	}, 'Failed to set planning start date');
 }

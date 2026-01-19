@@ -3,15 +3,14 @@
  * Normalizes to the 1st of each month to avoid date rollover issues
  * (e.g., Jan 31 + 1 month would incorrectly become Mar 3, not Feb 1)
  */
-export function getNextMonths(count: number): string[] {
+export function getNextMonthsFrom(baseDate: Date, count: number): string[] {
 	const months: string[] = [];
-	const today = new Date();
 
 	// Normalize to 1st of current month to avoid rollover bugs
-	const baseDate = new Date(today.getFullYear(), today.getMonth(), 1);
+	const normalizedBaseDate = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1);
 
 	for (let i = 0; i < count; i++) {
-		const date = new Date(baseDate.getFullYear(), baseDate.getMonth() + i, 1);
+		const date = new Date(normalizedBaseDate.getFullYear(), normalizedBaseDate.getMonth() + i, 1);
 
 		const year = date.getFullYear();
 		const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -19,6 +18,15 @@ export function getNextMonths(count: number): string[] {
 	}
 
 	return months;
+}
+
+/**
+ * Get the next N months starting from today in YYYY-MM format
+ * Normalizes to the 1st of each month to avoid date rollover issues
+ * (e.g., Jan 31 + 1 month would incorrectly become Mar 3, not Feb 1)
+ */
+export function getNextMonths(count: number): string[] {
+	return getNextMonthsFrom(new Date(), count);
 }
 
 /**

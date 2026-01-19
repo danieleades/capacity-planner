@@ -15,6 +15,7 @@ describe('KanbanBoard', () => {
 			destroy: () => {}
 		};
 	}) as unknown as OptimisticEnhanceAction<PlanningPageData>;
+	const planningStartDate = new Date('2025-01-01');
 
 	let initialState: AppState;
 
@@ -32,7 +33,7 @@ describe('KanbanBoard', () => {
 			const appState = createAppStore(initialState);
 			const { teams, workPackages, unassignedWorkPackages } = createDerivedStores(appState);
 			render(KanbanBoard, { 
-				props: { optimisticEnhance: mockOptimisticEnhance },
+				props: { optimisticEnhance: mockOptimisticEnhance, planningStartDate },
 				context: new Map<string, unknown>([
 					['appState', appState],
 					['teams', teams],
@@ -72,7 +73,7 @@ describe('KanbanBoard', () => {
 			const appState = createAppStore(initialState);
 			const { teams, workPackages, unassignedWorkPackages } = createDerivedStores(appState);
 			const { container } = render(KanbanBoard, { 
-				props: { optimisticEnhance: mockOptimisticEnhance },
+				props: { optimisticEnhance: mockOptimisticEnhance, planningStartDate },
 				context: new Map<string, unknown>([
 					['appState', appState],
 					['teams', teams],
@@ -126,7 +127,7 @@ describe('KanbanBoard', () => {
 			const appState = createAppStore(initialState);
 			const { teams, workPackages, unassignedWorkPackages } = createDerivedStores(appState);
 			render(KanbanBoard, { 
-				props: { optimisticEnhance: mockOptimisticEnhance },
+				props: { optimisticEnhance: mockOptimisticEnhance, planningStartDate },
 				context: new Map<string, unknown>([
 					['appState', appState],
 					['teams', teams],
@@ -165,7 +166,7 @@ describe('KanbanBoard', () => {
 			const appState = createAppStore(initialState);
 			const { teams, workPackages, unassignedWorkPackages } = createDerivedStores(appState);
 			render(KanbanBoard, { 
-				props: { optimisticEnhance: mockOptimisticEnhance },
+				props: { optimisticEnhance: mockOptimisticEnhance, planningStartDate },
 				context: new Map<string, unknown>([
 					['appState', appState],
 					['teams', teams],
@@ -186,7 +187,7 @@ describe('KanbanBoard', () => {
 			const appState = createAppStore(initialState);
 			const { teams, workPackages, unassignedWorkPackages } = createDerivedStores(appState);
 			render(KanbanBoard, { 
-				props: { optimisticEnhance: mockOptimisticEnhance },
+				props: { optimisticEnhance: mockOptimisticEnhance, planningStartDate },
 				context: new Map<string, unknown>([
 					['appState', appState],
 					['teams', teams],
@@ -205,7 +206,7 @@ describe('KanbanBoard', () => {
 			const appState = createAppStore(initialState);
 			const { teams, workPackages, unassignedWorkPackages } = createDerivedStores(appState);
 			render(KanbanBoard, { 
-				props: { optimisticEnhance: mockOptimisticEnhance },
+				props: { optimisticEnhance: mockOptimisticEnhance, planningStartDate },
 				context: new Map<string, unknown>([
 					['appState', appState],
 					['teams', teams],
@@ -222,7 +223,7 @@ describe('KanbanBoard', () => {
 			const appState = createAppStore(initialState);
 			const { teams, workPackages, unassignedWorkPackages } = createDerivedStores(appState);
 			const { container } = render(KanbanBoard, { 
-				props: { optimisticEnhance: mockOptimisticEnhance },
+				props: { optimisticEnhance: mockOptimisticEnhance, planningStartDate },
 				context: new Map<string, unknown>([
 					['appState', appState],
 					['teams', teams],

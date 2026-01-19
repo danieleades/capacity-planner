@@ -63,7 +63,9 @@ vi.mock('$lib/server/repositories/planning.repository', async () => {
 		'$lib/server/repositories/planning.repository'
 	);
 	return {
-		getPlanningView: () => actual.getPlanningView(testDb)
+		getPlanningView: () => actual.getPlanningView(testDb),
+		getPlanningStartDate: () => actual.getPlanningStartDate(testDb),
+		setPlanningStartDate: (dateStr: string) => actual.setPlanningStartDate(dateStr, testDb)
 	};
 });
 

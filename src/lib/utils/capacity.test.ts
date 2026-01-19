@@ -14,7 +14,11 @@ import {
 	calculateCardHeight,
 	CARD_HEIGHT_CONFIG,
 } from './capacity';
+import { YearMonth } from '$lib/types';
 import { createMockTeam, createMockWorkPackage } from '../../test/utils/test-data';
+
+/** Helper to get YYYY-MM string from a Date */
+const ym = (date: Date) => YearMonth.fromDate(date).toString();
 
 describe('capacity utilities', () => {
 	describe('getCapacityForMonth', () => {
@@ -438,14 +442,14 @@ describe('capacity utilities', () => {
 			const workPackages = [
 				createMockWorkPackage({ id: 'wp-1', sizeInPersonMonths: 3 }),
 			];
-			const startDate = new Date('2025-01-15');
+			const startDate = new Date(2025, 0, 15); // Jan 15, 2025
 			const result = calculateTeamSchedule(team, workPackages, startDate);
 
 			expect(result).toHaveLength(1);
 			expect(result[0].workPackage.id).toBe('wp-1');
-			expect(result[0].startYearMonth).toBe('2025-01');
+			expect(ym(result[0].startDate)).toBe('2025-01');
 			// 3 PM at 2 PM/month = completes in Feb (Jan: 2, Feb: 1)
-			expect(result[0].endYearMonth).toBe('2025-02');
+			expect(ym(result[0].endDate)).toBe('2025-02');
 		});
 
 		it('should schedule work packages sequentially', () => {
@@ -454,21 +458,18 @@ describe('capacity utilities', () => {
 				createMockWorkPackage({ id: 'wp-1', sizeInPersonMonths: 2, scheduledPosition: 0 }),
 				createMockWorkPackage({ id: 'wp-2', sizeInPersonMonths: 1, scheduledPosition: 1 }),
 			];
-			const startDate = new Date('2025-01-01');
+			const startDate = new Date(2025, 0, 1); // Jan 1, 2025
 			const result = calculateTeamSchedule(team, workPackages, startDate);
 
 			expect(result).toHaveLength(2);
 			// First WP: Jan-Feb (2 months at 1 PM/month)
 			expect(result[0].workPackage.id).toBe('wp-1');
-			expect(result[0].startYearMonth).toBe('2025-01');
-			expect(result[0].endYearMonth).toBe('2025-02');
-			// After WP-1 finishes in Feb, availableCapacity=0 but remainingWork=0
-			// So we don't advance to next month. currentMonth stays at Feb.
-			// WP-2: startYearMonth captured as '2025-02', then loop sees 0 capacity,
-			// advances to Mar, does 1 PM work, ends in Mar
+			expect(ym(result[0].startDate)).toBe('2025-01');
+			expect(ym(result[0].endDate)).toBe('2025-02');
+			// WP-2 starts where WP-1 ended (Feb) and finishes in Mar
 			expect(result[1].workPackage.id).toBe('wp-2');
-			expect(result[1].startYearMonth).toBe('2025-02');  // Captured before skipping zero-capacity
-			expect(result[1].endYearMonth).toBe('2025-03');    // Actual work done in Mar
+			expect(ym(result[1].startDate)).toBe('2025-02');
+			expect(ym(result[1].endDate)).toBe('2025-03');
 		});
 
 		it('should carry over fractional capacity', () => {
@@ -477,18 +478,16 @@ describe('capacity utilities', () => {
 				createMockWorkPackage({ id: 'wp-1', sizeInPersonMonths: 1, scheduledPosition: 0 }),
 				createMockWorkPackage({ id: 'wp-2', sizeInPersonMonths: 1.5, scheduledPosition: 1 }),
 			];
-			const startDate = new Date('2025-01-01');
+			const startDate = new Date(2025, 0, 1); // Jan 1, 2025
 			const result = calculateTeamSchedule(team, workPackages, startDate);
 
 			expect(result).toHaveLength(2);
 			// First WP: 1 PM in Jan (uses half of Jan's capacity)
-			expect(result[0].startYearMonth).toBe('2025-01');
-			expect(result[0].endYearMonth).toBe('2025-01');
-			// Second WP: 1 PM remaining in Jan + 0.5 PM in Feb... wait, only 1.5 total
-			// Actually: 1 PM leftover in Jan, so wp-2 uses 1 PM in Jan + 0.5 in Feb?
-			// No: 1.5 PM work, 1 PM leftover = all fits in Jan
-			expect(result[1].startYearMonth).toBe('2025-01');
-			expect(result[1].endYearMonth).toBe('2025-02');
+			expect(ym(result[0].startDate)).toBe('2025-01');
+			expect(ym(result[0].endDate)).toBe('2025-01');
+			// Second WP: 1 PM leftover in Jan + needs 0.5 more in Feb
+			expect(ym(result[1].startDate)).toBe('2025-01');
+			expect(ym(result[1].endDate)).toBe('2025-02');
 		});
 
 		it('should skip completed work packages', () => {
@@ -497,7 +496,7 @@ describe('capacity utilities', () => {
 				createMockWorkPackage({ id: 'wp-1', sizeInPersonMonths: 2, progressPercent: 100, scheduledPosition: 0 }),
 				createMockWorkPackage({ id: 'wp-2', sizeInPersonMonths: 1, progressPercent: 0, scheduledPosition: 1 }),
 			];
-			const startDate = new Date('2025-01-01');
+			const startDate = new Date(2025, 0, 1);
 			const result = calculateTeamSchedule(team, workPackages, startDate);
 
 			expect(result).toHaveLength(1);
@@ -509,13 +508,13 @@ describe('capacity utilities', () => {
 			const workPackages = [
 				createMockWorkPackage({ id: 'wp-1', sizeInPersonMonths: 4, progressPercent: 50 }),
 			];
-			const startDate = new Date('2025-01-01');
+			const startDate = new Date(2025, 0, 1);
 			const result = calculateTeamSchedule(team, workPackages, startDate);
 
 			expect(result).toHaveLength(1);
 			// 2 PM remaining at 1 PM/month = 2 months
-			expect(result[0].startYearMonth).toBe('2025-01');
-			expect(result[0].endYearMonth).toBe('2025-02');
+			expect(ym(result[0].startDate)).toBe('2025-01');
+			expect(ym(result[0].endDate)).toBe('2025-02');
 		});
 
 		it('should handle variable capacity with overrides', () => {
@@ -529,13 +528,13 @@ describe('capacity utilities', () => {
 			const workPackages = [
 				createMockWorkPackage({ id: 'wp-1', sizeInPersonMonths: 4 }),
 			];
-			const startDate = new Date('2025-01-01');
+			const startDate = new Date(2025, 0, 1);
 			const result = calculateTeamSchedule(team, workPackages, startDate);
 
 			expect(result).toHaveLength(1);
 			// 4 PM: 1 in Jan + 3 in Feb = completes in Feb
-			expect(result[0].startYearMonth).toBe('2025-01');
-			expect(result[0].endYearMonth).toBe('2025-02');
+			expect(ym(result[0].startDate)).toBe('2025-01');
+			expect(ym(result[0].endDate)).toBe('2025-02');
 		});
 
 		it('should skip months with zero capacity', () => {
@@ -549,13 +548,13 @@ describe('capacity utilities', () => {
 			const workPackages = [
 				createMockWorkPackage({ id: 'wp-1', sizeInPersonMonths: 3 }),
 			];
-			const startDate = new Date('2025-01-01');
+			const startDate = new Date(2025, 0, 1);
 			const result = calculateTeamSchedule(team, workPackages, startDate);
 
 			expect(result).toHaveLength(1);
 			// 3 PM: 1 in Jan, skip Feb, 2 in Mar = completes in Mar
-			expect(result[0].startYearMonth).toBe('2025-01');
-			expect(result[0].endYearMonth).toBe('2025-03');
+			expect(ym(result[0].startDate)).toBe('2025-01');
+			expect(ym(result[0].endDate)).toBe('2025-03');
 		});
 
 		it('should sort by scheduledPosition before scheduling', () => {
@@ -564,7 +563,7 @@ describe('capacity utilities', () => {
 				createMockWorkPackage({ id: 'wp-second', sizeInPersonMonths: 1, scheduledPosition: 1 }),
 				createMockWorkPackage({ id: 'wp-first', sizeInPersonMonths: 1, scheduledPosition: 0 }),
 			];
-			const startDate = new Date('2025-01-01');
+			const startDate = new Date(2025, 0, 1);
 			const result = calculateTeamSchedule(team, workPackages, startDate);
 
 			expect(result).toHaveLength(2);
@@ -577,12 +576,12 @@ describe('capacity utilities', () => {
 			const workPackages = [
 				createMockWorkPackage({ id: 'wp-1', sizeInPersonMonths: 5 }),
 			];
-			const startDate = new Date('2025-01-01');
+			const startDate = new Date(2025, 0, 1);
 			const result = calculateTeamSchedule(team, workPackages, startDate);
 
 			expect(result).toHaveLength(1);
-			expect(result[0].startYearMonth).toBe('2025-01');
-			expect(result[0].endYearMonth).toBe('2025-05');
+			expect(ym(result[0].startDate)).toBe('2025-01');
+			expect(ym(result[0].endDate)).toBe('2025-05');
 		});
 
 		it('should handle year boundary correctly', () => {
@@ -590,12 +589,12 @@ describe('capacity utilities', () => {
 			const workPackages = [
 				createMockWorkPackage({ id: 'wp-1', sizeInPersonMonths: 3 }),
 			];
-			const startDate = new Date('2025-11-01');
+			const startDate = new Date(2025, 10, 1); // Nov 1, 2025
 			const result = calculateTeamSchedule(team, workPackages, startDate);
 
 			expect(result).toHaveLength(1);
-			expect(result[0].startYearMonth).toBe('2025-11');
-			expect(result[0].endYearMonth).toBe('2026-01');
+			expect(ym(result[0].startDate)).toBe('2025-11');
+			expect(ym(result[0].endDate)).toBe('2026-01');
 		});
 
 		it('should handle work that finishes exactly on month boundary', () => {
@@ -604,18 +603,16 @@ describe('capacity utilities', () => {
 				createMockWorkPackage({ id: 'wp-1', sizeInPersonMonths: 2, scheduledPosition: 0 }),
 				createMockWorkPackage({ id: 'wp-2', sizeInPersonMonths: 1, scheduledPosition: 1 }),
 			];
-			const startDate = new Date('2025-01-01');
+			const startDate = new Date(2025, 0, 1);
 			const result = calculateTeamSchedule(team, workPackages, startDate);
 
 			expect(result).toHaveLength(2);
 			// First WP uses exactly Jan's capacity (2 PM)
-			expect(result[0].startYearMonth).toBe('2025-01');
-			expect(result[0].endYearMonth).toBe('2025-01');
-			// After WP-1: currentMonth=Jan, availableCapacity=0, remainingWork=0
-			// WP-2 starts with startYearMonth='2025-01', then loop skips to Feb (0 capacity)
-			// Work is done in Feb
-			expect(result[1].startYearMonth).toBe('2025-01');  // Captured before skip
-			expect(result[1].endYearMonth).toBe('2025-02');    // Actual work in Feb
+			expect(ym(result[0].startDate)).toBe('2025-01');
+			expect(ym(result[0].endDate)).toBe('2025-01');
+			// WP-2 starts where WP-1 ended (end of Jan) and finishes in Feb
+			expect(ym(result[1].startDate)).toBe('2025-01');
+			expect(ym(result[1].endDate)).toBe('2025-02');
 		});
 
 		it('should handle fractional work spanning months', () => {
@@ -623,13 +620,13 @@ describe('capacity utilities', () => {
 			const workPackages = [
 				createMockWorkPackage({ id: 'wp-1', sizeInPersonMonths: 2.5 }),
 			];
-			const startDate = new Date('2025-01-01');
+			const startDate = new Date(2025, 0, 1);
 			const result = calculateTeamSchedule(team, workPackages, startDate);
 
 			expect(result).toHaveLength(1);
 			// 2.5 PM: 2 in Jan, 0.5 in Feb = completes in Feb
-			expect(result[0].startYearMonth).toBe('2025-01');
-			expect(result[0].endYearMonth).toBe('2025-02');
+			expect(ym(result[0].startDate)).toBe('2025-01');
+			expect(ym(result[0].endDate)).toBe('2025-02');
 		});
 
 		it('should carry leftover capacity to next work package', () => {
@@ -639,17 +636,108 @@ describe('capacity utilities', () => {
 				createMockWorkPackage({ id: 'wp-2', sizeInPersonMonths: 1, scheduledPosition: 1 }),
 				createMockWorkPackage({ id: 'wp-3', sizeInPersonMonths: 1, scheduledPosition: 2 }),
 			];
-			const startDate = new Date('2025-01-01');
+			const startDate = new Date(2025, 0, 1);
 			const result = calculateTeamSchedule(team, workPackages, startDate);
 
 			expect(result).toHaveLength(3);
 			// All 3 WPs fit in January (3 PM capacity)
-			expect(result[0].startYearMonth).toBe('2025-01');
-			expect(result[0].endYearMonth).toBe('2025-01');
-			expect(result[1].startYearMonth).toBe('2025-01');
-			expect(result[1].endYearMonth).toBe('2025-01');
-			expect(result[2].startYearMonth).toBe('2025-01');
-			expect(result[2].endYearMonth).toBe('2025-01');
+			expect(ym(result[0].startDate)).toBe('2025-01');
+			expect(ym(result[0].endDate)).toBe('2025-01');
+			expect(ym(result[1].startDate)).toBe('2025-01');
+			expect(ym(result[1].endDate)).toBe('2025-01');
+			expect(ym(result[2].startDate)).toBe('2025-01');
+			expect(ym(result[2].endDate)).toBe('2025-01');
+		});
+	});
+
+	describe('precise date calculations', () => {
+		describe('simulateWorkCompletion - day precision', () => {
+			it('should return precise day when work completes mid-month', () => {
+				const team = createMockTeam({ monthlyCapacityInPersonMonths: 2.0 });
+				const startDate = new Date(2025, 0, 1); // Jan 1, 2025
+				// 3 PM work: 2 PM in Jan, 1 PM in Feb
+				// 1 PM / 2 PM = 50% of February
+				// February 2025 has 28 days, 50% = day 14
+				const result = simulateWorkCompletion(team, 3.0, startDate);
+				expect(result).not.toBeNull();
+				expect(result!.getFullYear()).toBe(2025);
+				expect(result!.getMonth()).toBe(1); // February
+				expect(result!.getDate()).toBe(14); // Mid-month
+			});
+
+			it('should return last day when work completes exactly at month boundary', () => {
+				const team = createMockTeam({ monthlyCapacityInPersonMonths: 2.0 });
+				const startDate = new Date(2025, 0, 1); // Jan 1, 2025
+				// 2 PM work: exactly 2 PM in Jan = completes end of Jan
+				const result = simulateWorkCompletion(team, 2.0, startDate);
+				expect(result).not.toBeNull();
+				expect(result!.getFullYear()).toBe(2025);
+				expect(result!.getMonth()).toBe(0); // January
+				expect(result!.getDate()).toBe(31); // Last day of January
+			});
+
+			it('should handle variable month lengths', () => {
+				const team = createMockTeam({ monthlyCapacityInPersonMonths: 1.0 });
+				const startDate = new Date(2025, 2, 1); // Mar 1, 2025 (31 days)
+				// 0.5 PM work at 1 PM/month = 50% of March
+				const result = simulateWorkCompletion(team, 0.5, startDate);
+				expect(result).not.toBeNull();
+				expect(result!.getMonth()).toBe(2); // March
+				// 50% of 31 days = ~15-16
+				expect(result!.getDate()).toBeGreaterThanOrEqual(15);
+				expect(result!.getDate()).toBeLessThanOrEqual(16);
+			});
+		});
+
+		describe('calculateTeamSchedule - precise dates', () => {
+			it('should return startDate and endDate as Date objects', () => {
+				const team = createMockTeam({ monthlyCapacityInPersonMonths: 2 });
+				const workPackages = [
+					createMockWorkPackage({ id: 'wp-1', sizeInPersonMonths: 3 }),
+				];
+				const startDate = new Date(2025, 0, 1);
+				const result = calculateTeamSchedule(team, workPackages, startDate);
+
+				expect(result).toHaveLength(1);
+				expect(result[0].startDate).toBeInstanceOf(Date);
+				expect(result[0].endDate).toBeInstanceOf(Date);
+			});
+
+			it('should calculate precise start and end dates', () => {
+				const team = createMockTeam({ monthlyCapacityInPersonMonths: 2 });
+				const workPackages = [
+					createMockWorkPackage({ id: 'wp-1', sizeInPersonMonths: 3, scheduledPosition: 0 }),
+				];
+				const startDate = new Date(2025, 0, 1);
+				const result = calculateTeamSchedule(team, workPackages, startDate);
+
+				// 3 PM at 2 PM/month: 2 PM in Jan, 1 PM in Feb
+				// Starts: Jan 1
+				// Ends: Feb 14 (50% through Feb's 28 days)
+				expect(result[0].startDate.getMonth()).toBe(0); // January
+				expect(result[0].startDate.getDate()).toBe(1);
+				expect(result[0].endDate.getMonth()).toBe(1); // February
+				expect(result[0].endDate.getDate()).toBe(14);
+			});
+
+			it('should chain work packages with precise dates', () => {
+				const team = createMockTeam({ monthlyCapacityInPersonMonths: 2 });
+				const workPackages = [
+					createMockWorkPackage({ id: 'wp-1', sizeInPersonMonths: 1, scheduledPosition: 0 }),
+					createMockWorkPackage({ id: 'wp-2', sizeInPersonMonths: 1, scheduledPosition: 1 }),
+				];
+				const startDate = new Date(2025, 0, 1);
+				const result = calculateTeamSchedule(team, workPackages, startDate);
+
+				expect(result).toHaveLength(2);
+				// WP-1: 1 PM at 2 PM/month = 50% of Jan = ends around Jan 15-16
+				expect(result[0].startDate.getDate()).toBe(1);
+				expect(result[0].endDate.getDate()).toBeGreaterThanOrEqual(15);
+				expect(result[0].endDate.getDate()).toBeLessThanOrEqual(16);
+
+				// WP-2 should start exactly where WP-1 ended
+				expect(result[1].startDate.getTime()).toBe(result[0].endDate.getTime());
+			});
 		});
 	});
 

@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+export { YearMonth } from './YearMonth';
+
 // Zod schemas - single source of truth
 export const MonthlyCapacitySchema = z.object({
 	yearMonth: z.string().regex(/^\d{4}-\d{2}$/, 'Must be in YYYY-MM format'),
@@ -46,7 +48,8 @@ export const AppStateSchema = z
 	);
 
 export const PlanningPageDataSchema = z.object({
-	initialState: AppStateSchema
+	initialState: AppStateSchema,
+	planningStartDate: z.date()
 });
 
 // TypeScript types inferred from Zod schemas

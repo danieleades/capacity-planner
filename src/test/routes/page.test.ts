@@ -45,7 +45,8 @@ function normalizePageData(data: PlanningPageData) {
 				assignedTeamId: workPackage.assignedTeamId ?? undefined,
 				scheduledPosition: workPackage.scheduledPosition ?? undefined
 			}))
-		}
+		},
+		planningStartDate: data.planningStartDate ?? '2025-01-15'
 	};
 }
 
@@ -78,7 +79,8 @@ describe('Page Component - Initial Render', () => {
 			initialState: {
 				teams,
 				workPackages: []
-			}
+			},
+			planningStartDate: new Date(2025, 0, 15)
 		};
 
 		renderPage(testData);
@@ -114,7 +116,8 @@ describe('Page Component - Initial Render', () => {
 			initialState: {
 				teams: [],
 				workPackages
-			}
+			},
+			planningStartDate: new Date(2025, 0, 15)
 		};
 
 		renderPage(testData);
@@ -153,7 +156,8 @@ describe('Page Component - Initial Render', () => {
 			initialState: {
 				teams,
 				workPackages
-			}
+			},
+			planningStartDate: new Date(2025, 0, 15)
 		};
 
 		renderPage(testData);
@@ -200,7 +204,8 @@ describe('Page Component - Initial Render', () => {
 			initialState: {
 				teams,
 				workPackages
-			}
+			},
+			planningStartDate: new Date(2025, 0, 15)
 		};
 
 		renderPage(testData);
@@ -218,7 +223,8 @@ describe('Page Component - Initial Render', () => {
 			initialState: {
 				teams: [],
 				workPackages: []
-			}
+			},
+			planningStartDate: new Date(2025, 0, 15)
 		};
 
 		renderPage(testData);
