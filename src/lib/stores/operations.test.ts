@@ -322,12 +322,12 @@ describe('store operations', () => {
 			expect(result.workPackages[2].scheduledPosition).toBe(1);
 		});
 
-		it('should handle null assignedTeamId', () => {
+		it('should handle undefined assignedTeamId (unassign)', () => {
 			const wp = createMockWorkPackage({ assignedTeamId: 'team-1' });
 			const state = { ...initialState, workPackages: [wp] };
 
 			const result = batchUpdateWorkPackages(state, [
-				{ id: wp.id, assignedTeamId: null }
+				{ id: wp.id, assignedTeamId: undefined, scheduledPosition: 0 }
 			]);
 
 			expect(result.workPackages[0].assignedTeamId).toBeUndefined();
@@ -338,7 +338,7 @@ describe('store operations', () => {
 			const state = { ...initialState, workPackages: [wp] };
 			const originalTeamId = wp.assignedTeamId;
 
-			batchUpdateWorkPackages(state, [{ id: wp.id, assignedTeamId: 'team-1' }]);
+			batchUpdateWorkPackages(state, [{ id: wp.id, assignedTeamId: 'team-1', scheduledPosition: 0 }]);
 
 			expect(state.workPackages[0].assignedTeamId).toBe(originalTeamId);
 		});

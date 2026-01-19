@@ -1,4 +1,5 @@
-import type { Team, WorkPackage, MonthlyCapacity, AppState } from '$lib/types';
+import type { Team, WorkPackage, MonthlyCapacity, AppState, StoreReorderUpdate } from '$lib/types';
+import { generateId } from '$lib/utils/id';
 
 /**
  * Pure functions for state operations - testable without side effects
@@ -12,7 +13,7 @@ export function addTeam(state: AppState, name: string, capacity: number, id?: st
 		teams: [
 			...state.teams,
 			{
-				id: id || crypto.randomUUID(),
+				id: id || generateId(),
 				name,
 				monthlyCapacityInPersonMonths: capacity,
 				capacityOverrides: [],
@@ -125,7 +126,7 @@ export function addWorkPackage(
 		workPackages: [
 			...state.workPackages,
 			{
-				id: id || crypto.randomUUID(),
+				id: id || generateId(),
 				title,
 				description,
 				sizeInPersonMonths: size,
@@ -182,7 +183,7 @@ export function reorderWorkPackages(state: AppState, workPackages: WorkPackage[]
  */
 export function batchUpdateWorkPackages(
 	state: AppState,
-	updates: Array<{ id: string; assignedTeamId?: string | null; scheduledPosition?: number }>
+	updates: StoreReorderUpdate[]
 ): AppState {
 	return {
 		...state,
@@ -192,10 +193,8 @@ export function batchUpdateWorkPackages(
 
 			return {
 				...wp,
-				...(update.assignedTeamId !== undefined
-					? { assignedTeamId: update.assignedTeamId ?? undefined }
-					: {}),
-				...(update.scheduledPosition !== undefined ? { scheduledPosition: update.scheduledPosition } : {}),
+				assignedTeamId: update.assignedTeamId,
+				scheduledPosition: update.scheduledPosition,
 			};
 		}),
 	};

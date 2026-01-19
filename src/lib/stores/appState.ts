@@ -1,5 +1,5 @@
 import { writable, derived, get } from 'svelte/store';
-import type { WorkPackage, Team, AppState } from '$lib/types';
+import type { WorkPackage, Team, AppState, StoreReorderUpdate } from '$lib/types';
 import * as ops from './operations';
 
 // Create the main state store
@@ -60,7 +60,7 @@ export const createAppStore = (initialState?: AppState) => {
 			update((state) => ops.assignWorkPackage(state, workPackageId, teamId));
 		},
 
-		batchUpdateWorkPackages: (updates: Array<{ id: string; assignedTeamId?: string | null; scheduledPosition?: number }>) => {
+		batchUpdateWorkPackages: (updates: StoreReorderUpdate[]) => {
 			update((state) => ops.batchUpdateWorkPackages(state, updates));
 		},
 

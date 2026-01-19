@@ -3,6 +3,7 @@ import { teams, capacityOverrides, workPackages, settings } from '../schema';
 import type { DbParam } from './types';
 import { dbOperation } from './db-helpers';
 import { eq } from 'drizzle-orm';
+import { scheduledPositionComparator } from '$lib/utils/capacity';
 
 /**
  * Domain model interfaces for planning view
@@ -91,29 +92,13 @@ export function getPlanningView(db: DbParam = defaultDb): PlanningView {
 			}
 		}
 
-		// Sort work packages by scheduled_position within each team
+		// Sort work packages by scheduled position with fallback to priority
 		for (const teamWorkPackages of workPackagesByTeam.values()) {
-			teamWorkPackages.sort((a, b) => {
-				// Handle null positions - put them at the end
-				if (a.scheduledPosition === null && b.scheduledPosition === null) return 0;
-				if (a.scheduledPosition === null) return 1;
-				if (b.scheduledPosition === null) return -1;
-				return a.scheduledPosition - b.scheduledPosition;
-			});
+			teamWorkPackages.sort(scheduledPositionComparator);
 		}
 
 		// Sort unassigned work packages by scheduledPosition (if set), otherwise by priority
-		unassignedWorkPackages.sort((a, b) => {
-			// Both have scheduled positions - use those
-			if (a.scheduledPosition !== null && b.scheduledPosition !== null) {
-				return a.scheduledPosition - b.scheduledPosition;
-			}
-			// One has scheduled position - it comes first
-			if (a.scheduledPosition !== null) return -1;
-			if (b.scheduledPosition !== null) return 1;
-			// Neither has scheduled position - fall back to priority
-			return a.priority - b.priority;
-		});
+		unassignedWorkPackages.sort(scheduledPositionComparator);
 
 		// Transform teams into domain models
 		const teamModels: Team[] = allTeams.map((team) => ({

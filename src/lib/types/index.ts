@@ -1,10 +1,18 @@
 import { z } from 'zod';
 
-export { YearMonth } from './YearMonth';
+import { YearMonth } from './YearMonth';
+export { YearMonth };
+export * from './dto';
+
+// YearMonth schema with proper validation (month 1-12)
+export const YearMonthSchema = z.string().refine(
+	(str) => YearMonth.isValid(str),
+	{ message: 'Must be valid YYYY-MM with month 1-12' }
+);
 
 // Zod schemas - single source of truth
 export const MonthlyCapacitySchema = z.object({
-	yearMonth: z.string().regex(/^\d{4}-\d{2}$/, 'Must be in YYYY-MM format'),
+	yearMonth: YearMonthSchema,
 	capacity: z.number().nonnegative('Capacity must be non-negative')
 });
 

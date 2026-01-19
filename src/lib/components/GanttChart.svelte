@@ -2,7 +2,7 @@
 	import { getContext } from 'svelte';
 	import type { Readable } from 'svelte/store';
 	import { createAppStore } from '$lib/stores/appState';
-	import { calculateTeamSchedule, type ScheduledWorkPackage, toYearMonth } from '$lib/utils/capacity';
+	import { calculateTeamSchedule, type ScheduledWorkPackage } from '$lib/utils/capacity';
 	import { getNextMonthsFrom, getMonthsInRange, formatYearMonth } from '$lib/utils/dates';
 	import { YearMonth, type Team } from '$lib/types';
 
@@ -20,7 +20,7 @@
 	const MIN_TIMELINE_MONTHS = 6;
 	const COLUMN_WIDTH_PX = 80; // Minimum width per month column
 
-	let planningStartMonth = $derived(toYearMonth(planningStartDate));
+	let planningStartMonth = $derived(YearMonth.fromDate(planningStartDate).toString());
 
 	// Team colors for visual distinction
 	const teamColors = [

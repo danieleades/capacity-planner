@@ -4,6 +4,7 @@ import { eq, and } from 'drizzle-orm';
 import type { Team, CapacityOverride, NewTeam, TeamUpdate, DbParam } from './types';
 import { teamValidation, capacityOverrideValidation, handleValidationError } from '../validation';
 import { withTimestamps, withUpdatedTimestamp, dbOperation } from './db-helpers';
+import { generateId } from '$lib/utils/id';
 
 /**
  * Re-export types for backward compatibility
@@ -105,7 +106,7 @@ export async function setCapacityOverride(
 	return dbOperation(async () => {
 		try {
 			const validated = capacityOverrideValidation.create.parse({
-				id: crypto.randomUUID(),
+				id: generateId(),
 				teamId,
 				yearMonth,
 				capacity

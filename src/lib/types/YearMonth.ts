@@ -20,6 +20,34 @@ export class YearMonth {
 		return new YearMonth(date.getFullYear(), date.getMonth() + 1);
 	}
 
+	/**
+	 * Get the current month as a YearMonth
+	 */
+	static current(): YearMonth {
+		return YearMonth.fromDate(new Date());
+	}
+
+	/**
+	 * Check if a string is a valid YearMonth format (YYYY-MM with month 1-12)
+	 */
+	static isValid(str: string): boolean {
+		const match = str.match(/^(\d{4})-(\d{2})$/);
+		if (!match) return false;
+		const month = parseInt(match[2], 10);
+		return month >= 1 && month <= 12;
+	}
+
+	/**
+	 * Try to parse a string as YearMonth, returning null if invalid
+	 */
+	static tryParse(str: string): YearMonth | null {
+		try {
+			return YearMonth.parse(str);
+		} catch {
+			return null;
+		}
+	}
+
 	static parse(str: string): YearMonth {
 		const match = str.match(/^(\d{4})-(\d{2})$/);
 		if (!match) {
@@ -47,6 +75,30 @@ export class YearMonth {
 	addMonths(n: number): YearMonth {
 		const date = new Date(this.year, this.month - 1 + n, 1);
 		return YearMonth.fromDate(date);
+	}
+
+	/**
+	 * Get the next N months starting from this month (inclusive)
+	 */
+	next(count: number): YearMonth[] {
+		const result: YearMonth[] = [];
+		for (let i = 0; i < count; i++) {
+			result.push(this.addMonths(i));
+		}
+		return result;
+	}
+
+	/**
+	 * Get all months from this month to the end month (inclusive)
+	 */
+	rangeTo(end: YearMonth): YearMonth[] {
+		const result: YearMonth[] = [];
+		let current: YearMonth = this;
+		while (current.compareTo(end) <= 0) {
+			result.push(current);
+			current = current.addMonths(1);
+		}
+		return result;
 	}
 
 	compareTo(other: YearMonth): number {

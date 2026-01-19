@@ -2,7 +2,6 @@ import { describe, it, expect, vi } from 'vitest';
 import {
 	getCapacityForMonth,
 	calculateTotalWorkMonths,
-	toYearMonth,
 	simulateWorkCompletion,
 	calculateTeamBacklog,
 	formatMonths,
@@ -72,22 +71,22 @@ describe('capacity utilities', () => {
 		});
 	});
 
-	describe('toYearMonth', () => {
+	describe('YearMonth.fromDate', () => {
 		it('should format date as YYYY-MM', () => {
 			const date = new Date('2025-01-15');
-			const result = toYearMonth(date);
+			const result = YearMonth.fromDate(date).toString();
 			expect(result).toBe('2025-01');
 		});
 
 		it('should pad single-digit months with zero', () => {
 			const date = new Date('2025-03-01');
-			const result = toYearMonth(date);
+			const result = YearMonth.fromDate(date).toString();
 			expect(result).toBe('2025-03');
 		});
 
 		it('should handle December correctly', () => {
 			const date = new Date('2025-12-31');
-			const result = toYearMonth(date);
+			const result = YearMonth.fromDate(date).toString();
 			expect(result).toBe('2025-12');
 		});
 	});

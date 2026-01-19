@@ -242,4 +242,59 @@ describe('KanbanBoard', () => {
 			expect(form).toHaveAttribute('method', 'POST');
 		});
 	});
+
+	describe('planning start date', () => {
+		it('should update time to complete when planning start date changes', async () => {
+			initialState = {
+				teams: [
+					{
+						id: 'team-1',
+						name: 'Engineering Team',
+						monthlyCapacityInPersonMonths: 1.0,
+						capacityOverrides: [{ yearMonth: '2025-01', capacity: 4.0 }]
+					}
+				],
+				workPackages: [
+					{
+						id: 'wp-1',
+						title: 'Large Work',
+						description: undefined,
+						sizeInPersonMonths: 4.0,
+						priority: 0,
+						progressPercent: 0,
+						assignedTeamId: 'team-1',
+						scheduledPosition: 0
+					}
+				]
+			};
+
+			const appState = createAppStore(initialState);
+			const { teams, workPackages, unassignedWorkPackages } = createDerivedStores(appState);
+			const context = new Map<string, unknown>([
+				['appState', appState],
+				['teams', teams],
+				['workPackages', workPackages],
+				['unassignedWorkPackages', unassignedWorkPackages]
+			]);
+			const { rerender } = render(KanbanBoard, {
+				props: { optimisticEnhance: mockOptimisticEnhance, planningStartDate },
+				context
+			});
+
+			// Wait for effects to run - check that the displayed time matches expected capacity
+			await vi.waitFor(() => {
+				// Find the specific paragraph containing "Time to complete:"
+				const timeElement = screen.getByText(/Time to complete:/).closest('p');
+				expect(timeElement?.textContent).toContain('1.0 months');
+			});
+
+			await rerender({ optimisticEnhance: mockOptimisticEnhance, planningStartDate: new Date('2025-02-01') });
+
+			// Wait for effects to run after rerender
+			await vi.waitFor(() => {
+				const timeElement = screen.getByText(/Time to complete:/).closest('p');
+				expect(timeElement?.textContent).toContain('4.0 months');
+			});
+		});
+	});
 });

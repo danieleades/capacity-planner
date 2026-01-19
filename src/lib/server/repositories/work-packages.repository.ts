@@ -2,6 +2,7 @@ import { db as defaultDb } from '../db';
 import { workPackages } from '../schema';
 import { eq, sql, isNull } from 'drizzle-orm';
 import type { WorkPackage, NewWorkPackage, WorkPackageUpdate, DbParam } from './types';
+import type { ReorderUpdate } from '$lib/types';
 import { workPackageValidation, handleValidationError } from '../validation';
 import { withTimestamps, withUpdatedTimestamp, dbOperation } from './db-helpers';
 
@@ -147,7 +148,7 @@ export async function unassignWorkPackage(
  * @param db - Database instance (defaults to main db)
  */
 export async function reorderWorkPackages(
-	updates: Array<{ id: string; teamId: string | null; position: number }>,
+	updates: ReorderUpdate[],
 	db: DbParam = defaultDb
 ): Promise<void> {
 	return dbOperation(() => {

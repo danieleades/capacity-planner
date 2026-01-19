@@ -54,15 +54,23 @@
 	}
 
 	// Planning start date - the actual Date object used by components
-	let planningStartDate = $state(toDate(data.planningStartDate));
+	// Initialize as placeholder; $effect below will set the real value synchronously on mount
+	let planningStartDate: Date = $state(new Date());
 
 	// String representation for the input field
-	let planningStartDateInput = $state(formatDateForInput(toDate(data.planningStartDate)));
+	let planningStartDateInput: string = $state('');
 
-	// Keep in sync if server data changes (e.g., after form submission)
+	// Debounced save to server when planning start date changes
+	let saveTimeout: ReturnType<typeof setTimeout> | null = null;
+	let lastSavedTimestamp: number = $state(0);
+
+	// Sync from server data on mount and when data changes
+	// This runs synchronously on mount, so the placeholder values above are never visible
 	$effect(() => {
-		planningStartDate = toDate(data.planningStartDate);
-		planningStartDateInput = formatDateForInput(toDate(data.planningStartDate));
+		const serverDate = toDate(data.planningStartDate);
+		planningStartDate = serverDate;
+		planningStartDateInput = formatDateForInput(serverDate);
+		lastSavedTimestamp = serverDate.getTime();
 	});
 
 	// Update the Date when input changes
@@ -84,10 +92,6 @@
 		);
 		return start < todayMidnight;
 	});
-
-	// Debounced save to server when planning start date changes
-	let saveTimeout: ReturnType<typeof setTimeout> | null = null;
-	let lastSavedTimestamp = toDate(data.planningStartDate).getTime();
 
 	$effect(() => {
 		const currentTimestamp = planningStartDate.getTime();

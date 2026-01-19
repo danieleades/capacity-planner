@@ -16,7 +16,7 @@
 		type TeamBacklogMetrics,
 		type ScheduledWorkPackage,
 	} from '$lib/utils/capacity';
-	import { YearMonth, type WorkPackage, type Team, type PlanningPageData } from '$lib/types';
+	import { YearMonth, type WorkPackage, type Team, type PlanningPageData, type ReorderUpdate, toStoreUpdate } from '$lib/types';
 	import type { OptimisticEnhanceAction } from '$lib/types/optimistic';
 	import CapacitySparkline from './CapacitySparkline.svelte';
 	import WorkPackageModal from './WorkPackageModal.svelte';
@@ -78,7 +78,7 @@
 	// Performance optimization: Pre-groups work packages by team in O(n) time,
 	// then passes pre-filtered arrays to calculateTeamBacklog to avoid redundant
 	// O(n) filtering per team. This reduces complexity from O(teams × packages) to O(packages).
-	function buildColumns(): Column[] {
+	function buildColumns(startDate: Date): Column[] {
 		const { byTeam, unassigned } = groupWorkPackagesByTeam($appState.workPackages);
 
 		const cols: Column[] = [
@@ -94,7 +94,7 @@
 			const teamWPs = byTeam.get(team.id) || [];
 			// Pass preFiltered=true since teamWPs is already filtered for this team
 			// This avoids redundant O(n) filtering inside calculateTeamBacklog
-			const metrics = calculateTeamBacklog(team, teamWPs, true, planningStartDate);
+			const metrics = calculateTeamBacklog(team, teamWPs, true, startDate);
 
 			cols.push({
 				id: team.id,
@@ -112,15 +112,16 @@
 	}
 
 	// Use mutable local state for columns (required by svelte-dnd-action)
-	// eslint-disable-next-line svelte/prefer-writable-derived
-	let columns: Column[] = $state(buildColumns());
+	// Initialize empty; $effect.pre will populate before DOM updates
+	let columns: Column[] = $state([]);
 
-	// Sync columns when store changes (add/edit/delete operations)
+	// Sync columns when store changes or planningStartDate changes
 	// buildColumns() will sort by scheduledPosition (with fallback to priority)
-	// Note: $state + $effect is required here instead of $derived because
+	// Note: $state + $effect.pre is required here instead of $derived because
 	// svelte-dnd-action needs mutable local state that gets updated in event handlers
-	$effect(() => {
-		columns = buildColumns();
+	// Using $effect.pre ensures columns are populated before rendering
+	$effect.pre(() => {
+		columns = buildColumns(planningStartDate);
 	});
 
 	// Calculate global maximum remaining work across all work packages for size scaling
@@ -176,41 +177,26 @@
 			return col;
 		});
 
-		// Collect all updates for the batch request
-		type LocalReorderUpdate = {
-			id: string;
-			teamId: string | null;
-			position: number;
-		};
-		const updates: LocalReorderUpdate[] = items.map((wp, index) => ({
+		// Collect all updates for the batch request using shared DTO type
+		const updates: ReorderUpdate[] = items.map((wp, index) => ({
 			id: wp.id,
 			teamId: newTeamId ?? null,
-			position: index,
-			isPending: false
-		}));
-		const persistedUpdates = updates.map((update, index) => ({
-			id: update.id,
-			teamId: update.teamId,
 			position: index
 		}));
 
 		// Capture snapshot before optimistic update for rollback
 		const snapshot = $appState;
 
-		// Optimistically update the store using batch operation
-		appState.batchUpdateWorkPackages(updates.map(u => ({
-			id: u.id,
-			assignedTeamId: u.teamId,
-			scheduledPosition: u.position
-		})));
+		// Optimistically update the store using batch operation (convert to store format)
+		appState.batchUpdateWorkPackages(updates.map(toStoreUpdate));
 
-		// Skip server request if there are no persisted updates to send
-		if (persistedUpdates.length === 0) {
+		// Skip server request if there are no updates to send
+		if (updates.length === 0) {
 			return;
 		}
 
 		// Submit single batch request to persist all changes
-		submitBatchReorder(persistedUpdates, snapshot);
+		submitBatchReorder(updates, snapshot);
 	}
 
 	// Centralized error handler for fetch operations with rollback support
@@ -242,7 +228,7 @@
 
 	// Helper function to submit batch reorder to server
 	async function submitBatchReorder(
-		updates: Array<{ id: string; teamId: string | null; position: number }>,
+		updates: ReorderUpdate[],
 		snapshot: typeof $appState
 	) {
 		const formData = new FormData();

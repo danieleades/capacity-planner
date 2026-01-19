@@ -1,9 +1,13 @@
 import { z } from 'zod';
+import { YearMonth } from '$lib/types';
 
 /**
  * Reusable validation primitives
  */
-const yearMonth = z.string().regex(/^\d{4}-\d{2}$/);
+const yearMonth = z.string().refine(
+	(str) => YearMonth.isValid(str),
+	{ message: 'Must be valid YYYY-MM with month 1-12' }
+);
 const positiveNumber = z.number().positive();
 const nonNegativeNumber = z.number().nonnegative();
 const nonNegativeInt = z.number().int().nonnegative();
