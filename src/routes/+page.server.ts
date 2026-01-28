@@ -1,6 +1,7 @@
 import type { PageServerLoad, Actions } from './$types';
 import { fail } from '@sveltejs/kit';
 import { ZodError } from 'zod';
+import { unsafeTeamId, unsafeWorkPackageId } from '$lib/types';
 import { getPlanningView, getPlanningStartDate, setPlanningStartDate } from '$lib/server/repositories/planning.repository';
 import {
 	createWorkPackage,
@@ -72,27 +73,28 @@ export const load: PageServerLoad = async () => {
 		const planningStartDate = storedDateStr ? parseDateString(storedDateStr) : getTodayDate();
 
 		// Transform PlanningView into AppState format (flat arrays)
+		// Cast string IDs to branded types at the boundary
 		// Flatten work packages from all teams and unassigned into a single array
 		const allWorkPackages = [
 			...planningView.unassignedWorkPackages.map(wp => ({
-				id: wp.id,
+				id: unsafeWorkPackageId(wp.id),
 				title: wp.title,
-				description: wp.description || undefined,
+				description: wp.description || null,
 				sizeInPersonMonths: wp.sizeInPersonMonths,
 				priority: wp.priority,
-				assignedTeamId: undefined,
-				scheduledPosition: wp.scheduledPosition ?? undefined,
+				assignedTeamId: null,
+				scheduledPosition: wp.scheduledPosition ?? null,
 				progressPercent: wp.progressPercent
 			})),
 			...planningView.teams.flatMap(team =>
 				team.workPackages.map(wp => ({
-					id: wp.id,
+					id: unsafeWorkPackageId(wp.id),
 					title: wp.title,
-					description: wp.description || undefined,
+					description: wp.description || null,
 					sizeInPersonMonths: wp.sizeInPersonMonths,
 					priority: wp.priority,
-					assignedTeamId: team.id,
-					scheduledPosition: wp.scheduledPosition ?? undefined,
+					assignedTeamId: unsafeTeamId(team.id),
+					scheduledPosition: wp.scheduledPosition ?? null,
 					progressPercent: wp.progressPercent
 				}))
 			)
@@ -100,7 +102,7 @@ export const load: PageServerLoad = async () => {
 
 		// Transform teams into AppState format
 		const allTeams = planningView.teams.map(team => ({
-			id: team.id,
+			id: unsafeTeamId(team.id),
 			name: team.name,
 			monthlyCapacityInPersonMonths: team.monthlyCapacity,
 			capacityOverrides: team.capacityOverrides.map(override => ({
@@ -553,7 +555,13 @@ export const actions: Actions = {
 				}
 			}
 
-			await reorderWorkPackages(updates);
+			// Cast to branded types for the repository
+			const brandedUpdates = updates.map(u => ({
+				id: unsafeWorkPackageId(u.id),
+				teamId: u.teamId ? unsafeTeamId(u.teamId) : null,
+				position: u.position
+			}));
+			await reorderWorkPackages(brandedUpdates);
 			return { success: true };
 		} catch (error) {
 			console.error('Failed to reorder work packages:', error);

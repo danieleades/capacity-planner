@@ -16,7 +16,7 @@
 		type TeamBacklogMetrics,
 		type ScheduledWorkPackage,
 	} from '$lib/utils/capacity';
-	import { YearMonth, type WorkPackage, type Team, type PlanningPageData, type ReorderUpdate, toStoreUpdate } from '$lib/types';
+	import { YearMonth, type WorkPackage, type Team, type PlanningPageData, type ReorderUpdate, type TeamId, unsafeTeamId } from '$lib/types';
 	import type { OptimisticEnhanceAction } from '$lib/types/optimistic';
 	import CapacitySparkline from './CapacitySparkline.svelte';
 	import WorkPackageModal from './WorkPackageModal.svelte';
@@ -111,15 +111,12 @@
 		return cols;
 	}
 
-	// Use mutable local state for columns (required by svelte-dnd-action)
-	// Initialize empty; $effect.pre will populate before DOM updates
-	let columns: Column[] = $state([]);
-
-	// Sync columns when store changes or planningStartDate changes
-	// buildColumns() will sort by scheduledPosition (with fallback to priority)
-	// Note: $state + $effect.pre is required here instead of $derived because
-	// svelte-dnd-action needs mutable local state that gets updated in event handlers
-	// Using $effect.pre ensures columns are populated before rendering
+	// svelte-dnd-action requires mutable local state that DnD handlers can write to.
+	// Using $state + $effect.pre (not $derived) because svelte-dnd-action's action
+	// update cycle can conflict with writable $derived re-derivation timing.
+	// eslint-disable-next-line svelte/prefer-writable-derived -- see comment above
+	let columns: Column[] = $state<Column[]>([]);
+	// Sync columns when store or planningStartDate changes (runs before DOM update)
 	$effect.pre(() => {
 		columns = buildColumns(planningStartDate);
 	});
@@ -166,7 +163,7 @@
 	 */
 	function handleDndFinalize(columnId: string, e: CustomEvent) {
 		const items = e.detail.items as WorkPackage[];
-		const newTeamId = columnId === 'unassigned' ? undefined : columnId;
+		const newTeamId: TeamId | null = columnId === 'unassigned' ? null : unsafeTeamId(columnId);
 
 
 		// Update local state first
@@ -180,15 +177,15 @@
 		// Collect all updates for the batch request using shared DTO type
 		const updates: ReorderUpdate[] = items.map((wp, index) => ({
 			id: wp.id,
-			teamId: newTeamId ?? null,
+			teamId: newTeamId,
 			position: index
 		}));
 
 		// Capture snapshot before optimistic update for rollback
 		const snapshot = $appState;
 
-		// Optimistically update the store using batch operation (convert to store format)
-		appState.batchUpdateWorkPackages(updates.map(toStoreUpdate));
+		// Optimistically update the store using batch operation
+		appState.batchUpdateWorkPackages(updates);
 
 		// Skip server request if there are no updates to send
 		if (updates.length === 0) {

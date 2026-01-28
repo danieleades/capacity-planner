@@ -2,7 +2,8 @@
 	import { getContext } from 'svelte';
 	import type { Readable } from 'svelte/store';
 	import { createAppStore } from '$lib/stores/appState';
-	import type { WorkPackage, PlanningPageData } from '$lib/types';
+	import type { WorkPackage, PlanningPageData, WorkPackageId } from '$lib/types';
+	import { unsafeWorkPackageId } from '$lib/types';
 	import type { OptimisticEnhanceAction } from '$lib/types/optimistic';
 	import WorkPackageModal from './WorkPackageModal.svelte';
 
@@ -18,7 +19,7 @@
 
 	// Modal state
 	let showAddModal = $state(false);
-	let editingWorkPackageId = $state<string | undefined>(undefined);
+	let editingWorkPackageId = $state<WorkPackageId | undefined>(undefined);
 	let deleteFormRefs: Record<string, HTMLFormElement | null> = {};
 
 	// Derive the actual work package object from the ID so it's always current
@@ -31,7 +32,7 @@
 		showAddModal = true;
 	}
 
-function openEditModal(workPackageId: string) {
+function openEditModal(workPackageId: WorkPackageId) {
 		const wp = $workPackages.find((w) => w.id === workPackageId);
 		if (!wp) {
 			return;
@@ -79,9 +80,10 @@ function handleDelete(workPackage: WorkPackage) {
 				data-client-action="delete-work-package"
 				use:optimisticEnhance={(data, input) => {
 					// Capture snapshot before optimistic delete for rollback
-					const workPackageId = input.formData.get('id') as string;
+					const idValue = input.formData.get('id') as string;
+					const workPackageId = unsafeWorkPackageId(idValue);
 					const snapshots = getContext<Map<string, unknown>>('rollbackSnapshots');
-					snapshots.set('delete-work-package-' + workPackageId, $appState);
+					snapshots.set('delete-work-package-' + idValue, $appState);
 
 					// Use store operation to delete work package
 					appState.deleteWorkPackage(workPackageId);

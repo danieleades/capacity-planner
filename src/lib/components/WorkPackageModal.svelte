@@ -4,8 +4,8 @@ import { createAppStore } from '$lib/stores/appState';
 import Modal from './Modal.svelte';
 import WorkPackageForm from './WorkPackageForm.svelte';
 import type { WorkPackage, PlanningPageData } from '$lib/types';
+import { unsafeWorkPackageId, generateWorkPackageId } from '$lib/types';
 import type { OptimisticEnhanceAction } from '$lib/types/optimistic';
-import { generateId } from '$lib/utils/id';
 
 	interface Props {
 		optimisticEnhance: OptimisticEnhanceAction<PlanningPageData>;
@@ -22,7 +22,7 @@ import { generateId } from '$lib/utils/id';
 	let formDescription = $state('');
 	let formProgressPercent = $state(0);
 	let workPackageFormRef = $state<HTMLFormElement | null>(null);
-	let newWorkPackageId = $state<string>(generateId());
+	let newWorkPackageId = $state(generateWorkPackageId());
 	const appState = getContext<ReturnType<typeof createAppStore>>('appState');
 
 	// Update form when editingWorkPackage changes
@@ -40,7 +40,7 @@ import { generateId } from '$lib/utils/id';
 			formSize = 0;
 			formDescription = '';
 			formProgressPercent = 0;
-			newWorkPackageId = generateId();
+			newWorkPackageId = generateWorkPackageId();
 		}
 	});
 
@@ -81,21 +81,22 @@ import { generateId } from '$lib/utils/id';
 			if (typeof idValue !== 'string' || idValue.length === 0) {
 				return;
 			}
+			const workPackageId = unsafeWorkPackageId(idValue);
 
 			// Check if this is an update by looking if the ID already exists in the store
-			const existingWorkPackage = appState.findWorkPackageById(idValue);
+			const existingWorkPackage = appState.findWorkPackageById(workPackageId);
 
 			if (existingWorkPackage) {
 				// Use store operation to update work package
-				appState.updateWorkPackage(idValue, {
+				appState.updateWorkPackage(workPackageId, {
 					title,
 					sizeInPersonMonths,
-					description: description || undefined,
+					description: description || null,
 					...(progressPercent !== undefined ? { progressPercent } : {})
 				});
 			} else {
 				// Use store operation to add work package
-				appState.addWorkPackage(title, sizeInPersonMonths, description || undefined, idValue);
+				appState.addWorkPackage(title, sizeInPersonMonths, description || undefined, workPackageId);
 			}
 		}}
 		onsubmit={(e: SubmitEvent) => {

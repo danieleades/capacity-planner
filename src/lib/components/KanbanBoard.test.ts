@@ -4,6 +4,7 @@ import KanbanBoard from './KanbanBoard.svelte';
 import { createAppStore, createDerivedStores } from '$lib/stores/appState';
 import type { OptimisticEnhanceAction } from '$lib/types/optimistic';
 import type { PlanningPageData, AppState } from '$lib/types';
+import { testTeamId, testWorkPackageId } from '../../test/utils/test-data';
 
 // Mock fetch for drag-and-drop tests
 global.fetch = vi.fn();
@@ -32,7 +33,7 @@ describe('KanbanBoard', () => {
 		it('should render unassigned column', () => {
 			const appState = createAppStore(initialState);
 			const { teams, workPackages, unassignedWorkPackages } = createDerivedStores(appState);
-			render(KanbanBoard, { 
+			render(KanbanBoard, {
 				props: { optimisticEnhance: mockOptimisticEnhance, planningStartDate },
 				context: new Map<string, unknown>([
 					['appState', appState],
@@ -41,7 +42,7 @@ describe('KanbanBoard', () => {
 					['unassignedWorkPackages', unassignedWorkPackages]
 				])
 			});
-			
+
 			expect(screen.getByText('Unassigned')).toBeInTheDocument();
 		});
 
@@ -50,7 +51,7 @@ describe('KanbanBoard', () => {
 			initialState = {
 				teams: [
 					{
-						id: 'team-1',
+						id: testTeamId('team-1'),
 						name: 'Engineering Team',
 						monthlyCapacityInPersonMonths: 5.0,
 						capacityOverrides: []
@@ -58,13 +59,13 @@ describe('KanbanBoard', () => {
 				],
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'Test Work Package',
-						description: undefined,
+						description: null,
 						sizeInPersonMonths: 2.0,
 						priority: 0,
 						progressPercent: 0,
-						assignedTeamId: 'team-1',
+						assignedTeamId: testTeamId('team-1'),
 						scheduledPosition: 0
 					}
 				]
@@ -72,7 +73,7 @@ describe('KanbanBoard', () => {
 
 			const appState = createAppStore(initialState);
 			const { teams, workPackages, unassignedWorkPackages } = createDerivedStores(appState);
-			const { container } = render(KanbanBoard, { 
+			const { container } = render(KanbanBoard, {
 				props: { optimisticEnhance: mockOptimisticEnhance, planningStartDate },
 				context: new Map<string, unknown>([
 					['appState', appState],
@@ -84,9 +85,9 @@ describe('KanbanBoard', () => {
 
 			// Simulate svelte-dnd-action finalize event with empty items array
 			// This happens when the last item is dragged out of a column (origin zone event)
-			const teamColumn = container.querySelector('[data-id="team-1"]') || 
+			const teamColumn = container.querySelector('[data-id="team-1"]') ||
 			                   container.querySelectorAll('.min-h-96')[1]; // Second column (first team)
-			
+
 			if (teamColumn) {
 				const finalizeEvent = new CustomEvent('finalize', {
 					detail: {
@@ -94,16 +95,16 @@ describe('KanbanBoard', () => {
 						info: { source: 'pointer' }
 					}
 				});
-				
+
 				// Clear any previous fetch calls
 				vi.clearAllMocks();
-				
+
 				// Dispatch the event
 				teamColumn.dispatchEvent(finalizeEvent);
-				
+
 				// Wait for any async operations
 				await new Promise(resolve => setTimeout(resolve, 0));
-				
+
 				// Verify: No fetch call should be made when items array is empty
 				// This prevents the server from receiving an invalid empty updates array
 				// which would return a 400 error ("Updates must be a non-empty array")
@@ -115,7 +116,7 @@ describe('KanbanBoard', () => {
 			initialState = {
 				teams: [
 					{
-						id: 'team-1',
+						id: testTeamId('team-1'),
 						name: 'Engineering Team',
 						monthlyCapacityInPersonMonths: 5.0,
 						capacityOverrides: []
@@ -126,7 +127,7 @@ describe('KanbanBoard', () => {
 
 			const appState = createAppStore(initialState);
 			const { teams, workPackages, unassignedWorkPackages } = createDerivedStores(appState);
-			render(KanbanBoard, { 
+			render(KanbanBoard, {
 				props: { optimisticEnhance: mockOptimisticEnhance, planningStartDate },
 				context: new Map<string, unknown>([
 					['appState', appState],
@@ -135,7 +136,7 @@ describe('KanbanBoard', () => {
 					['unassignedWorkPackages', unassignedWorkPackages]
 				])
 			});
-			
+
 			expect(screen.getByText('Engineering Team')).toBeInTheDocument();
 		});
 
@@ -143,7 +144,7 @@ describe('KanbanBoard', () => {
 			initialState = {
 				teams: [
 					{
-						id: 'team-1',
+						id: testTeamId('team-1'),
 						name: 'Engineering Team',
 						monthlyCapacityInPersonMonths: 5.0,
 						capacityOverrides: []
@@ -151,13 +152,13 @@ describe('KanbanBoard', () => {
 				],
 				workPackages: [
 					{
-						id: 'wp-2',
+						id: testWorkPackageId('wp-2'),
 						title: 'Assigned Work',
-						description: undefined,
+						description: null,
 						sizeInPersonMonths: 3.0,
 						priority: 1,
 						progressPercent: 0,
-						assignedTeamId: 'team-1',
+						assignedTeamId: testTeamId('team-1'),
 						scheduledPosition: 0
 					}
 				]
@@ -165,7 +166,7 @@ describe('KanbanBoard', () => {
 
 			const appState = createAppStore(initialState);
 			const { teams, workPackages, unassignedWorkPackages } = createDerivedStores(appState);
-			render(KanbanBoard, { 
+			render(KanbanBoard, {
 				props: { optimisticEnhance: mockOptimisticEnhance, planningStartDate },
 				context: new Map<string, unknown>([
 					['appState', appState],
@@ -174,7 +175,7 @@ describe('KanbanBoard', () => {
 					['unassignedWorkPackages', unassignedWorkPackages]
 				])
 			});
-			
+
 			expect(screen.getByText('Assigned Work')).toBeInTheDocument();
 		});
 
@@ -186,7 +187,7 @@ describe('KanbanBoard', () => {
 			// The actual error handling is tested in integration tests
 			const appState = createAppStore(initialState);
 			const { teams, workPackages, unassignedWorkPackages } = createDerivedStores(appState);
-			render(KanbanBoard, { 
+			render(KanbanBoard, {
 				props: { optimisticEnhance: mockOptimisticEnhance, planningStartDate },
 				context: new Map<string, unknown>([
 					['appState', appState],
@@ -195,7 +196,7 @@ describe('KanbanBoard', () => {
 					['unassignedWorkPackages', unassignedWorkPackages]
 				])
 			});
-			
+
 			// Verify component renders (error handling is internal)
 			expect(screen.getByText('Unassigned')).toBeInTheDocument();
 		});
@@ -205,7 +206,7 @@ describe('KanbanBoard', () => {
 		it('should have add button in unassigned column', () => {
 			const appState = createAppStore(initialState);
 			const { teams, workPackages, unassignedWorkPackages } = createDerivedStores(appState);
-			render(KanbanBoard, { 
+			render(KanbanBoard, {
 				props: { optimisticEnhance: mockOptimisticEnhance, planningStartDate },
 				context: new Map<string, unknown>([
 					['appState', appState],
@@ -214,7 +215,7 @@ describe('KanbanBoard', () => {
 					['unassignedWorkPackages', unassignedWorkPackages]
 				])
 			});
-			
+
 			const addButton = screen.getByText('+ Add');
 			expect(addButton).toBeInTheDocument();
 		});
@@ -222,7 +223,7 @@ describe('KanbanBoard', () => {
 		it('should have form with createWorkPackage action', async () => {
 			const appState = createAppStore(initialState);
 			const { teams, workPackages, unassignedWorkPackages } = createDerivedStores(appState);
-			const { container } = render(KanbanBoard, { 
+			const { container } = render(KanbanBoard, {
 				props: { optimisticEnhance: mockOptimisticEnhance, planningStartDate },
 				context: new Map<string, unknown>([
 					['appState', appState],
@@ -231,11 +232,11 @@ describe('KanbanBoard', () => {
 					['unassignedWorkPackages', unassignedWorkPackages]
 				])
 			});
-			
+
 			// Open modal
 			const addButton = screen.getByText('+ Add');
 			await fireEvent.click(addButton);
-			
+
 			// Check form exists with correct action
 			const form = container.querySelector('form[action="?/createWorkPackage"]');
 			expect(form).toBeInTheDocument();
@@ -248,7 +249,7 @@ describe('KanbanBoard', () => {
 			initialState = {
 				teams: [
 					{
-						id: 'team-1',
+						id: testTeamId('team-1'),
 						name: 'Engineering Team',
 						monthlyCapacityInPersonMonths: 1.0,
 						capacityOverrides: [{ yearMonth: '2025-01', capacity: 4.0 }]
@@ -256,13 +257,13 @@ describe('KanbanBoard', () => {
 				],
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'Large Work',
-						description: undefined,
+						description: null,
 						sizeInPersonMonths: 4.0,
 						priority: 0,
 						progressPercent: 0,
-						assignedTeamId: 'team-1',
+						assignedTeamId: testTeamId('team-1'),
 						scheduledPosition: 0
 					}
 				]

@@ -4,17 +4,14 @@ import {
 	updateTeam,
 	deleteTeam,
 	setMonthlyCapacity,
-	clearMonthlyCapacity,
 	addWorkPackage,
 	updateWorkPackage,
 	deleteWorkPackage,
-	assignWorkPackage,
-	reorderWorkPackages,
 	batchUpdateWorkPackages,
 	clearUnassignedScheduledPositions
 } from './operations';
 import type { AppState } from '$lib/types';
-import { createMockTeam, createMockWorkPackage } from '../../test/utils/test-data';
+import { createMockTeam, createMockWorkPackage, testTeamId, testWorkPackageId } from '../../test/utils/test-data';
 
 describe('store operations', () => {
 	let initialState: AppState;
@@ -95,7 +92,7 @@ describe('store operations', () => {
 			const wp = createMockWorkPackage({ assignedTeamId: team.id });
 			const state = { teams: [team], workPackages: [wp] };
 			const result = deleteTeam(state, team.id);
-			expect(result.workPackages[0].assignedTeamId).toBeUndefined();
+			expect(result.workPackages[0].assignedTeamId).toBeNull();
 		});
 
 		it('should not affect work packages assigned to other teams', () => {
@@ -148,37 +145,6 @@ describe('store operations', () => {
 			const state = { ...initialState, teams: [team1, team2] };
 			const result = setMonthlyCapacity(state, team1.id, '2025-01', 3.0);
 			expect(result.teams[1].capacityOverrides).toEqual([]);
-		});
-	});
-
-	describe('clearMonthlyCapacity', () => {
-		it('should remove capacity override', () => {
-			const team = createMockTeam({
-				capacityOverrides: [{ yearMonth: '2025-01', capacity: 3.0 }],
-			});
-			const state = { ...initialState, teams: [team] };
-			const result = clearMonthlyCapacity(state, team.id, '2025-01');
-			expect(result.teams[0].capacityOverrides).toEqual([]);
-		});
-
-		it('should keep other overrides', () => {
-			const team = createMockTeam({
-				capacityOverrides: [
-					{ yearMonth: '2025-01', capacity: 2.0 },
-					{ yearMonth: '2025-02', capacity: 3.0 },
-				],
-			});
-			const state = { ...initialState, teams: [team] };
-			const result = clearMonthlyCapacity(state, team.id, '2025-01');
-			expect(result.teams[0].capacityOverrides).toHaveLength(1);
-			expect(result.teams[0].capacityOverrides![0].yearMonth).toBe('2025-02');
-		});
-
-		it('should handle clearing non-existent override', () => {
-			const team = createMockTeam();
-			const state = { ...initialState, teams: [team] };
-			const result = clearMonthlyCapacity(state, team.id, '2025-01');
-			expect(result.teams[0].capacityOverrides).toEqual([]);
 		});
 	});
 
@@ -252,93 +218,48 @@ describe('store operations', () => {
 		});
 	});
 
-	describe('assignWorkPackage', () => {
-		it('should assign work package to team', () => {
-			const wp = createMockWorkPackage();
-			const state = { ...initialState, workPackages: [wp] };
-			const result = assignWorkPackage(state, wp.id, 'team-123');
-			expect(result.workPackages[0].assignedTeamId).toBe('team-123');
-		});
-
-		it('should unassign work package when teamId is undefined', () => {
-			const wp = createMockWorkPackage({ assignedTeamId: 'team-123' });
-			const state = { ...initialState, workPackages: [wp] };
-			const result = assignWorkPackage(state, wp.id, undefined);
-			expect(result.workPackages[0].assignedTeamId).toBeUndefined();
-		});
-
-		it('should not affect other work packages', () => {
-			const wp1 = createMockWorkPackage();
-			const wp2 = createMockWorkPackage({ assignedTeamId: 'team-2' });
-			const state = { ...initialState, workPackages: [wp1, wp2] };
-			const result = assignWorkPackage(state, wp1.id, 'team-1');
-			expect(result.workPackages[1].assignedTeamId).toBe('team-2');
-		});
-	});
-
-	describe('reorderWorkPackages', () => {
-		it('should update priorities based on array order', () => {
-			const wp1 = createMockWorkPackage({ priority: 0 });
-			const wp2 = createMockWorkPackage({ priority: 1 });
-			const wp3 = createMockWorkPackage({ priority: 2 });
-			const state = { ...initialState, workPackages: [wp1, wp2, wp3] };
-
-			// Reorder: wp3, wp1, wp2
-			const result = reorderWorkPackages(state, [wp3, wp1, wp2]);
-			expect(result.workPackages[0].priority).toBe(0); // wp3
-			expect(result.workPackages[1].priority).toBe(1); // wp1
-			expect(result.workPackages[2].priority).toBe(2); // wp2
-		});
-
-		it('should handle single item', () => {
-			const wp = createMockWorkPackage({ priority: 5 });
-			const state = { ...initialState, workPackages: [wp] };
-			const result = reorderWorkPackages(state, [wp]);
-			expect(result.workPackages[0].priority).toBe(0);
-		});
-
-		it('should handle empty array', () => {
-			const result = reorderWorkPackages(initialState, []);
-			expect(result.workPackages).toHaveLength(0);
-		});
-	});
-
 	describe('batchUpdateWorkPackages', () => {
 		it('should update multiple work packages atomically', () => {
-			const wp1 = createMockWorkPackage({ id: 'wp1' });
-			const wp2 = createMockWorkPackage({ id: 'wp2' });
-			const wp3 = createMockWorkPackage({ id: 'wp3' });
+			const wpId1 = testWorkPackageId('wp1');
+			const wpId2 = testWorkPackageId('wp2');
+			const wpId3 = testWorkPackageId('wp3');
+			const teamId = testTeamId('team-1');
+			const wp1 = createMockWorkPackage({ id: wpId1 });
+			const wp2 = createMockWorkPackage({ id: wpId2 });
+			const wp3 = createMockWorkPackage({ id: wpId3 });
 			const state = { ...initialState, workPackages: [wp1, wp2, wp3] };
 
 			const result = batchUpdateWorkPackages(state, [
-				{ id: 'wp1', assignedTeamId: 'team-1', scheduledPosition: 0 },
-				{ id: 'wp3', assignedTeamId: 'team-1', scheduledPosition: 1 }
+				{ id: wpId1, teamId: teamId, position: 0 },
+				{ id: wpId3, teamId: teamId, position: 1 }
 			]);
 
-			expect(result.workPackages[0].assignedTeamId).toBe('team-1');
+			expect(result.workPackages[0].assignedTeamId).toBe(teamId);
 			expect(result.workPackages[0].scheduledPosition).toBe(0);
-			expect(result.workPackages[1].assignedTeamId).toBeUndefined();
-			expect(result.workPackages[2].assignedTeamId).toBe('team-1');
+			expect(result.workPackages[1].assignedTeamId).toBeNull();
+			expect(result.workPackages[2].assignedTeamId).toBe(teamId);
 			expect(result.workPackages[2].scheduledPosition).toBe(1);
 		});
 
-		it('should handle undefined assignedTeamId (unassign)', () => {
-			const wp = createMockWorkPackage({ assignedTeamId: 'team-1' });
+		it('should handle null teamId (unassign)', () => {
+			const teamId = testTeamId('team-1');
+			const wp = createMockWorkPackage({ assignedTeamId: teamId });
 			const state = { ...initialState, workPackages: [wp] };
 
 			const result = batchUpdateWorkPackages(state, [
-				{ id: wp.id, assignedTeamId: undefined, scheduledPosition: 0 }
+				{ id: wp.id, teamId: null, position: 0 }
 			]);
 
-			expect(result.workPackages[0].assignedTeamId).toBeUndefined();
+			expect(result.workPackages[0].assignedTeamId).toBeNull();
 		});
 
 		it('should not mutate original state', () => {
+			const teamId = testTeamId('team-1');
 			const wp = createMockWorkPackage();
 			const state = { ...initialState, workPackages: [wp] };
 			const originalTeamId = wp.assignedTeamId;
 
-			batchUpdateWorkPackages(state, [{ id: wp.id, assignedTeamId: 'team-1', scheduledPosition: 0 }]);
+			batchUpdateWorkPackages(state, [{ id: wp.id, teamId: teamId, position: 0 }]);
 
 			expect(state.workPackages[0].assignedTeamId).toBe(originalTeamId);
 		});
@@ -346,29 +267,30 @@ describe('store operations', () => {
 
 	describe('clearUnassignedScheduledPositions', () => {
 		it('should clear scheduledPosition for unassigned work packages', () => {
-			const wp1 = createMockWorkPackage({ assignedTeamId: undefined, scheduledPosition: 5 });
-			const wp2 = createMockWorkPackage({ assignedTeamId: undefined, scheduledPosition: 10 });
+			const wp1 = createMockWorkPackage({ assignedTeamId: null, scheduledPosition: 5 });
+			const wp2 = createMockWorkPackage({ assignedTeamId: null, scheduledPosition: 10 });
 			const state = { ...initialState, workPackages: [wp1, wp2] };
 
 			const result = clearUnassignedScheduledPositions(state);
 
-			expect(result.workPackages[0].scheduledPosition).toBeUndefined();
-			expect(result.workPackages[1].scheduledPosition).toBeUndefined();
+			expect(result.workPackages[0].scheduledPosition).toBeNull();
+			expect(result.workPackages[1].scheduledPosition).toBeNull();
 		});
 
 		it('should not affect assigned work packages', () => {
-			const wp1 = createMockWorkPackage({ assignedTeamId: 'team-1', scheduledPosition: 5 });
-			const wp2 = createMockWorkPackage({ assignedTeamId: undefined, scheduledPosition: 10 });
+			const teamId = testTeamId('team-1');
+			const wp1 = createMockWorkPackage({ assignedTeamId: teamId, scheduledPosition: 5 });
+			const wp2 = createMockWorkPackage({ assignedTeamId: null, scheduledPosition: 10 });
 			const state = { ...initialState, workPackages: [wp1, wp2] };
 
 			const result = clearUnassignedScheduledPositions(state);
 
 			expect(result.workPackages[0].scheduledPosition).toBe(5);
-			expect(result.workPackages[1].scheduledPosition).toBeUndefined();
+			expect(result.workPackages[1].scheduledPosition).toBeNull();
 		});
 
 		it('should not mutate original state', () => {
-			const wp = createMockWorkPackage({ assignedTeamId: undefined, scheduledPosition: 5 });
+			const wp = createMockWorkPackage({ assignedTeamId: null, scheduledPosition: 5 });
 			const state = { ...initialState, workPackages: [wp] };
 
 			clearUnassignedScheduledPositions(state);
@@ -385,8 +307,8 @@ describe('store operations', () => {
 
 			const result = deleteTeam(state, team.id);
 
-			expect(result.workPackages[0].assignedTeamId).toBeUndefined();
-			expect(result.workPackages[0].scheduledPosition).toBeUndefined();
+			expect(result.workPackages[0].assignedTeamId).toBeNull();
+			expect(result.workPackages[0].scheduledPosition).toBeNull();
 		});
 	});
 

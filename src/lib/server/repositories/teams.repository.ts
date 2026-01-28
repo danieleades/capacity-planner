@@ -149,16 +149,3 @@ export async function setCapacityOverride(
  * @param yearMonth - Year and month in format "YYYY-MM"
  * @param db - Database instance (defaults to main db)
  */
-export async function removeCapacityOverride(
-	teamId: string,
-	yearMonth: string,
-	db: DbParam = defaultDb
-): Promise<void> {
-	return dbOperation(async () => {
-		db.delete(capacityOverrides)
-			.where(
-				and(eq(capacityOverrides.teamId, teamId), eq(capacityOverrides.yearMonth, yearMonth))
-			)
-			.run();
-	}, 'Failed to remove capacity override');
-}

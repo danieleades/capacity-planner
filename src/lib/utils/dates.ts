@@ -42,9 +42,3 @@ export function getMonthsInRange(startMonth: string, endMonth: string): string[]
  * Calculate the number of months between two YYYY-MM dates (inclusive)
  * Returns negative if end is before start
  */
-export function monthsBetween(startMonth: string, endMonth: string): number {
-	const start = YearMonth.parse(startMonth);
-	const end = YearMonth.parse(endMonth);
-	// Formula: (endYear - startYear) * 12 + (endMonth - startMonth) + 1
-	return (end.year - start.year) * 12 + (end.month - start.month) + 1;
-}

@@ -12,6 +12,7 @@
 	import GanttChart from '$lib/components/GanttChart.svelte';
 	import ErrorBanner from '$lib/components/ErrorBanner.svelte';
 	import { createAppStore, createDerivedStores } from '$lib/stores/appState';
+	import { unsafeTeamId, unsafeWorkPackageId } from '$lib/types';
 
 	// Get page data as props - data stays reactive for optimistikit
 	const { data }: { data: PageData } = $props();
@@ -217,9 +218,9 @@
 				const pendingId = getIdFromForm(formData);
 				if (pendingId) {
 					if (actionType === 'create-work-package') {
-						appState.deleteWorkPackage(pendingId);
+						appState.deleteWorkPackage(unsafeWorkPackageId(pendingId));
 					} else {
-						appState.deleteTeam(pendingId);
+						appState.deleteTeam(unsafeTeamId(pendingId));
 					}
 				}
 				break;

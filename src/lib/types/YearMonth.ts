@@ -37,17 +37,6 @@ export class YearMonth {
 		return month >= 1 && month <= 12;
 	}
 
-	/**
-	 * Try to parse a string as YearMonth, returning null if invalid
-	 */
-	static tryParse(str: string): YearMonth | null {
-		try {
-			return YearMonth.parse(str);
-		} catch {
-			return null;
-		}
-	}
-
 	static parse(str: string): YearMonth {
 		const match = str.match(/^(\d{4})-(\d{2})$/);
 		if (!match) {
@@ -93,10 +82,8 @@ export class YearMonth {
 	 */
 	rangeTo(end: YearMonth): YearMonth[] {
 		const result: YearMonth[] = [];
-		let current: YearMonth = this;
-		while (current.compareTo(end) <= 0) {
-			result.push(current);
-			current = current.addMonths(1);
+		for (let i = 0; this.addMonths(i).compareTo(end) <= 0; i++) {
+			result.push(this.addMonths(i));
 		}
 		return result;
 	}

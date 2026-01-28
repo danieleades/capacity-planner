@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/svelte';
 import GanttChart from './GanttChart.svelte';
 import { createAppStore, createDerivedStores } from '$lib/stores/appState';
 import type { AppState } from '$lib/types';
+import { testTeamId, testWorkPackageId } from '../../test/utils/test-data';
 
 describe('GanttChart', () => {
 	let initialState: AppState;
@@ -48,7 +49,7 @@ describe('GanttChart', () => {
 			renderGanttChart({
 				teams: [
 					{
-						id: 'team-1',
+						id: testTeamId('team-1'),
 						name: 'Engineering',
 						monthlyCapacityInPersonMonths: 5,
 						capacityOverrides: []
@@ -64,7 +65,7 @@ describe('GanttChart', () => {
 			renderGanttChart({
 				teams: [
 					{
-						id: 'team-1',
+						id: testTeamId('team-1'),
 						name: 'Engineering',
 						monthlyCapacityInPersonMonths: 5,
 						capacityOverrides: []
@@ -72,12 +73,13 @@ describe('GanttChart', () => {
 				],
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'Unassigned Work',
+						description: null,
 						sizeInPersonMonths: 2,
 						priority: 0,
 						progressPercent: 0,
-						assignedTeamId: undefined,
+						assignedTeamId: null,
 						scheduledPosition: 0
 					}
 				]
@@ -92,7 +94,7 @@ describe('GanttChart', () => {
 			renderGanttChart({
 				teams: [
 					{
-						id: 'team-1',
+						id: testTeamId('team-1'),
 						name: 'Engineering',
 						monthlyCapacityInPersonMonths: 5,
 						capacityOverrides: []
@@ -100,12 +102,13 @@ describe('GanttChart', () => {
 				],
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'Feature A',
+						description: null,
 						sizeInPersonMonths: 2,
 						priority: 0,
 						progressPercent: 0,
-						assignedTeamId: 'team-1',
+						assignedTeamId: testTeamId('team-1'),
 						scheduledPosition: 0
 					}
 				]
@@ -121,7 +124,7 @@ describe('GanttChart', () => {
 			const { container } = renderGanttChart({
 				teams: [
 					{
-						id: 'team-1',
+						id: testTeamId('team-1'),
 						name: 'Engineering',
 						monthlyCapacityInPersonMonths: 5,
 						capacityOverrides: []
@@ -129,12 +132,13 @@ describe('GanttChart', () => {
 				],
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'Feature A',
+						description: null,
 						sizeInPersonMonths: 2,
 						priority: 0,
 						progressPercent: 0,
-						assignedTeamId: 'team-1',
+						assignedTeamId: testTeamId('team-1'),
 						scheduledPosition: 0
 					}
 				]
@@ -152,7 +156,7 @@ describe('GanttChart', () => {
 			renderGanttChart({
 				teams: [
 					{
-						id: 'team-1',
+						id: testTeamId('team-1'),
 						name: 'Platform Team',
 						monthlyCapacityInPersonMonths: 5,
 						capacityOverrides: []
@@ -160,21 +164,23 @@ describe('GanttChart', () => {
 				],
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'Feature A',
+						description: null,
 						sizeInPersonMonths: 2,
 						priority: 0,
 						progressPercent: 0,
-						assignedTeamId: 'team-1',
+						assignedTeamId: testTeamId('team-1'),
 						scheduledPosition: 0
 					},
 					{
-						id: 'wp-2',
+						id: testWorkPackageId('wp-2'),
 						title: 'Feature B',
+						description: null,
 						sizeInPersonMonths: 3,
 						priority: 1,
 						progressPercent: 0,
-						assignedTeamId: 'team-1',
+						assignedTeamId: testTeamId('team-1'),
 						scheduledPosition: 1
 					}
 				]
@@ -190,7 +196,7 @@ describe('GanttChart', () => {
 			renderGanttChart({
 				teams: [
 					{
-						id: 'team-1',
+						id: testTeamId('team-1'),
 						name: 'Platform Team',
 						monthlyCapacityInPersonMonths: 5,
 						capacityOverrides: []
@@ -198,12 +204,13 @@ describe('GanttChart', () => {
 				],
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'Feature A',
+						description: null,
 						sizeInPersonMonths: 2,
 						priority: 0,
 						progressPercent: 0,
-						assignedTeamId: 'team-1',
+						assignedTeamId: testTeamId('team-1'),
 						scheduledPosition: 0
 					}
 				]
@@ -216,13 +223,13 @@ describe('GanttChart', () => {
 			renderGanttChart({
 				teams: [
 					{
-						id: 'team-1',
+						id: testTeamId('team-1'),
 						name: 'Platform Team',
 						monthlyCapacityInPersonMonths: 5,
 						capacityOverrides: []
 					},
 					{
-						id: 'team-2',
+						id: testTeamId('team-2'),
 						name: 'Mobile Team',
 						monthlyCapacityInPersonMonths: 3,
 						capacityOverrides: []
@@ -230,21 +237,23 @@ describe('GanttChart', () => {
 				],
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'Feature A',
+						description: null,
 						sizeInPersonMonths: 2,
 						priority: 0,
 						progressPercent: 0,
-						assignedTeamId: 'team-1',
+						assignedTeamId: testTeamId('team-1'),
 						scheduledPosition: 0
 					},
 					{
-						id: 'wp-2',
+						id: testWorkPackageId('wp-2'),
 						title: 'Feature B',
+						description: null,
 						sizeInPersonMonths: 3,
 						priority: 1,
 						progressPercent: 0,
-						assignedTeamId: 'team-2',
+						assignedTeamId: testTeamId('team-2'),
 						scheduledPosition: 0
 					}
 				]
@@ -263,7 +272,7 @@ describe('GanttChart', () => {
 			renderGanttChart({
 				teams: [
 					{
-						id: 'team-1',
+						id: testTeamId('team-1'),
 						name: 'Engineering',
 						monthlyCapacityInPersonMonths: 5,
 						capacityOverrides: []
@@ -271,12 +280,13 @@ describe('GanttChart', () => {
 				],
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'Authentication System',
+						description: null,
 						sizeInPersonMonths: 2,
 						priority: 0,
 						progressPercent: 0,
-						assignedTeamId: 'team-1',
+						assignedTeamId: testTeamId('team-1'),
 						scheduledPosition: 0
 					}
 				]
@@ -291,7 +301,7 @@ describe('GanttChart', () => {
 			const { container } = renderGanttChart({
 				teams: [
 					{
-						id: 'team-1',
+						id: testTeamId('team-1'),
 						name: 'Engineering',
 						monthlyCapacityInPersonMonths: 5,
 						capacityOverrides: []
@@ -299,12 +309,13 @@ describe('GanttChart', () => {
 				],
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'Feature Work',
+						description: null,
 						sizeInPersonMonths: 2,
 						priority: 0,
 						progressPercent: 0,
-						assignedTeamId: 'team-1',
+						assignedTeamId: testTeamId('team-1'),
 						scheduledPosition: 0
 					}
 				]
@@ -319,7 +330,7 @@ describe('GanttChart', () => {
 			const { container } = renderGanttChart({
 				teams: [
 					{
-						id: 'team-1',
+						id: testTeamId('team-1'),
 						name: 'Engineering',
 						monthlyCapacityInPersonMonths: 1,
 						capacityOverrides: []
@@ -327,21 +338,23 @@ describe('GanttChart', () => {
 				],
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'First Task',
+						description: null,
 						sizeInPersonMonths: 2,
 						priority: 0,
 						progressPercent: 0,
-						assignedTeamId: 'team-1',
+						assignedTeamId: testTeamId('team-1'),
 						scheduledPosition: 0
 					},
 					{
-						id: 'wp-2',
+						id: testWorkPackageId('wp-2'),
 						title: 'Second Task',
+						description: null,
 						sizeInPersonMonths: 1,
 						priority: 1,
 						progressPercent: 0,
-						assignedTeamId: 'team-1',
+						assignedTeamId: testTeamId('team-1'),
 						scheduledPosition: 1
 					}
 				]
@@ -365,7 +378,7 @@ describe('GanttChart', () => {
 				renderGanttChart({
 				teams: [
 					{
-						id: 'team-1',
+						id: testTeamId('team-1'),
 						name: 'Engineering',
 						monthlyCapacityInPersonMonths: 1,
 						capacityOverrides: []
@@ -373,12 +386,13 @@ describe('GanttChart', () => {
 				],
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'Long Project',
+						description: null,
 						sizeInPersonMonths: 12,
 						priority: 0,
 						progressPercent: 0,
-						assignedTeamId: 'team-1',
+						assignedTeamId: testTeamId('team-1'),
 						scheduledPosition: 0
 					}
 				]
@@ -393,7 +407,7 @@ describe('GanttChart', () => {
 			renderGanttChart({
 				teams: [
 					{
-						id: 'team-1',
+						id: testTeamId('team-1'),
 						name: 'Engineering',
 						monthlyCapacityInPersonMonths: 10,
 						capacityOverrides: []
@@ -401,12 +415,13 @@ describe('GanttChart', () => {
 				],
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'Quick Task',
+						description: null,
 						sizeInPersonMonths: 0.5,
 						priority: 0,
 						progressPercent: 0,
-						assignedTeamId: 'team-1',
+						assignedTeamId: testTeamId('team-1'),
 						scheduledPosition: 0
 					}
 				]
@@ -422,7 +437,7 @@ describe('GanttChart', () => {
 			renderGanttChart({
 				teams: [
 					{
-						id: 'team-1',
+						id: testTeamId('team-1'),
 						name: 'Engineering',
 						monthlyCapacityInPersonMonths: 5,
 						capacityOverrides: []
@@ -430,12 +445,13 @@ describe('GanttChart', () => {
 				],
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'Feature A',
+						description: null,
 						sizeInPersonMonths: 2,
 						priority: 0,
 						progressPercent: 0,
-						assignedTeamId: 'team-1',
+						assignedTeamId: testTeamId('team-1'),
 						scheduledPosition: 0
 					}
 				]
@@ -448,13 +464,13 @@ describe('GanttChart', () => {
 			renderGanttChart({
 				teams: [
 					{
-						id: 'team-1',
+						id: testTeamId('team-1'),
 						name: 'Platform Team',
 						monthlyCapacityInPersonMonths: 5,
 						capacityOverrides: []
 					},
 					{
-						id: 'team-2',
+						id: testTeamId('team-2'),
 						name: 'Mobile Team',
 						monthlyCapacityInPersonMonths: 3,
 						capacityOverrides: []
@@ -462,21 +478,23 @@ describe('GanttChart', () => {
 				],
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'Feature A',
+						description: null,
 						sizeInPersonMonths: 2,
 						priority: 0,
 						progressPercent: 0,
-						assignedTeamId: 'team-1',
+						assignedTeamId: testTeamId('team-1'),
 						scheduledPosition: 0
 					},
 					{
-						id: 'wp-2',
+						id: testWorkPackageId('wp-2'),
 						title: 'Feature B',
+						description: null,
 						sizeInPersonMonths: 3,
 						priority: 1,
 						progressPercent: 0,
-						assignedTeamId: 'team-2',
+						assignedTeamId: testTeamId('team-2'),
 						scheduledPosition: 0
 					}
 				]
@@ -495,7 +513,7 @@ describe('GanttChart', () => {
 			const { container } = renderGanttChart({
 				teams: [
 					{
-						id: 'team-1',
+						id: testTeamId('team-1'),
 						name: 'Engineering',
 						monthlyCapacityInPersonMonths: 5,
 						capacityOverrides: []
@@ -503,12 +521,13 @@ describe('GanttChart', () => {
 				],
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'Completed Task',
+						description: null,
 						sizeInPersonMonths: 2,
 						priority: 0,
 						progressPercent: 100,
-						assignedTeamId: 'team-1',
+						assignedTeamId: testTeamId('team-1'),
 						scheduledPosition: 0
 					}
 				]
@@ -523,7 +542,7 @@ describe('GanttChart', () => {
 			const { container } = renderGanttChart({
 				teams: [
 					{
-						id: 'team-1',
+						id: testTeamId('team-1'),
 						name: 'Engineering',
 						monthlyCapacityInPersonMonths: 1,
 						capacityOverrides: []
@@ -531,12 +550,13 @@ describe('GanttChart', () => {
 				],
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'Partial Progress',
+						description: null,
 						sizeInPersonMonths: 4,
 						priority: 0,
 						progressPercent: 50, // 2 PM remaining
-						assignedTeamId: 'team-1',
+						assignedTeamId: testTeamId('team-1'),
 						scheduledPosition: 0
 					}
 				]
@@ -556,13 +576,13 @@ describe('GanttChart', () => {
 			const { container } = renderGanttChart({
 				teams: [
 					{
-						id: 'team-1',
+						id: testTeamId('team-1'),
 						name: 'Team A',
 						monthlyCapacityInPersonMonths: 5,
 						capacityOverrides: []
 					},
 					{
-						id: 'team-2',
+						id: testTeamId('team-2'),
 						name: 'Team B',
 						monthlyCapacityInPersonMonths: 5,
 						capacityOverrides: []
@@ -570,21 +590,23 @@ describe('GanttChart', () => {
 				],
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'Task A',
+						description: null,
 						sizeInPersonMonths: 1,
 						priority: 0,
 						progressPercent: 0,
-						assignedTeamId: 'team-1',
+						assignedTeamId: testTeamId('team-1'),
 						scheduledPosition: 0
 					},
 					{
-						id: 'wp-2',
+						id: testWorkPackageId('wp-2'),
 						title: 'Task B',
+						description: null,
 						sizeInPersonMonths: 1,
 						priority: 0,
 						progressPercent: 0,
-						assignedTeamId: 'team-2',
+						assignedTeamId: testTeamId('team-2'),
 						scheduledPosition: 0
 					}
 				]

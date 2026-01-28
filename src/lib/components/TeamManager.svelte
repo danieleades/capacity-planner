@@ -3,12 +3,12 @@ import { getContext } from 'svelte';
 import type { Readable } from 'svelte/store';
 import { createAppStore } from '$lib/stores/appState';
 import type { OptimisticEnhanceAction } from '$lib/types/optimistic';
-import type { Team, PlanningPageData } from '$lib/types';
+import type { Team, PlanningPageData, TeamId } from '$lib/types';
+import { unsafeTeamId, generateTeamId } from '$lib/types';
 import Modal from './Modal.svelte';
 import FormError from './FormError.svelte';
 import CapacitySparkline from './CapacitySparkline.svelte';
 import { getNextMonths, formatYearMonth } from '$lib/utils/dates';
-import { generateId } from '$lib/utils/id';
 
 // Configuration
 const COLUMN_WIDTH_PX = 100; // Width per month column
@@ -27,13 +27,13 @@ const teams = getContext<Readable<Team[]>>('teams');
 const capacityMonths = getNextMonths(12);
 
 let showAddModal = $state(false);
-	let editingTeam = $state<string | null>(null);
+	let editingTeam = $state<TeamId | null>(null);
 	let formName = $state('');
 	let formCapacity = $state('0');
 	let nameError = $state<string | null>(null);
 	let capacityError = $state<string | null>(null);
 	let teamFormRef = $state<HTMLFormElement | null>(null);
-let newTeamId = $state<string>(generateId());
+let newTeamId = $state(generateTeamId());
 	let isSubmitting = $state(false);
 
 function openAddModal() {
@@ -42,11 +42,11 @@ function openAddModal() {
 	editingTeam = null;
 	nameError = null;
 	capacityError = null;
-	newTeamId = generateId();
+	newTeamId = generateTeamId();
 	showAddModal = true;
 }
 
-function openEditModal(teamId: string) {
+function openEditModal(teamId: TeamId) {
 	const team = $teams.find((t) => t.id === teamId);
 	if (!team) {
 		return;
@@ -67,7 +67,7 @@ function openEditModal(teamId: string) {
 	formCapacity = '0';
 	nameError = null;
 	capacityError = null;
-	newTeamId = generateId();
+	newTeamId = generateTeamId();
 	}
 
 	function validateForm(): boolean {
@@ -148,9 +148,10 @@ function handleDelete(team: Team) {
 						data-client-action="delete-team"
 						use:optimisticEnhance={(data, input) => {
 							// Capture snapshot before optimistic delete for rollback
-							const teamId = input.formData.get('id') as string;
+							const idValue = input.formData.get('id') as string;
+							const teamId = unsafeTeamId(idValue);
 							const snapshots = getContext<Map<string, unknown>>('rollbackSnapshots');
-							snapshots.set('delete-team-' + teamId, $appState);
+							snapshots.set('delete-team-' + idValue, $appState);
 
 							// Use store operation to delete team
 							appState.deleteTeam(teamId);
@@ -221,7 +222,8 @@ function handleDelete(team: Team) {
 											data-client-action="update-capacity"
 											use:optimisticEnhance={(data, input) => {
 												// Optimistically update the capacity override
-												const teamId = input.formData.get('teamId') as string;
+												const idValue = input.formData.get('teamId') as string;
+												const teamId = unsafeTeamId(idValue);
 												const yearMonth = input.formData.get('yearMonth') as string;
 												const newCapacity = parseFloat(input.formData.get('capacity') as string);
 
@@ -233,7 +235,7 @@ function handleDelete(team: Team) {
 
 												// Capture snapshot before optimistic update for rollback
 												const snapshots = getContext<Map<string, unknown>>('rollbackSnapshots');
-												const snapshotKey = `update-capacity-${teamId}-${yearMonth}`;
+												const snapshotKey = `update-capacity-${idValue}-${yearMonth}`;
 												snapshots.set(snapshotKey, $appState);
 
 												// Use store operation (auto-removes override if it matches default)
@@ -293,9 +295,10 @@ function handleDelete(team: Team) {
 			if (typeof generatedIdRaw !== 'string' || generatedIdRaw.length === 0) {
 				return;
 			}
+			const teamId = unsafeTeamId(generatedIdRaw);
 
 			// Use store operation to add team
-			appState.addTeam(trimmedName, monthlyCapacity, generatedIdRaw);
+			appState.addTeam(trimmedName, monthlyCapacity, teamId);
 		}}
 		onsubmit={(e: SubmitEvent) => {
 			e.preventDefault();

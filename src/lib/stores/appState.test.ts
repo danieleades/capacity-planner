@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { get } from 'svelte/store';
 import { createAppStore, createDerivedStores } from './appState';
 import type { AppState } from '$lib/types';
+import { testTeamId, testWorkPackageId } from '../../test/utils/test-data';
 
 describe('appState store', () => {
 	let initialState: AppState;
@@ -16,7 +17,7 @@ describe('appState store', () => {
 	describe('createAppStore', () => {
 		it('should create store with provided initial state', () => {
 			const state: AppState = {
-				teams: [{ id: 'team-1', name: 'Test Team', monthlyCapacityInPersonMonths: 5, capacityOverrides: [] }],
+				teams: [{ id: testTeamId('team-1'), name: 'Test Team', monthlyCapacityInPersonMonths: 5, capacityOverrides: [] }],
 				workPackages: []
 			};
 			const store = createAppStore(state);
@@ -35,17 +36,17 @@ describe('appState store', () => {
 				const store = createAppStore({
 					teams: [],
 					workPackages: [
-						{ id: 'wp-1', title: 'Test WP', sizeInPersonMonths: 2, priority: 0, progressPercent: 0, scheduledPosition: 0 }
+						{ id: testWorkPackageId('wp-1'), title: 'Test WP', description: null, sizeInPersonMonths: 2, priority: 0, progressPercent: 0, assignedTeamId: null, scheduledPosition: 0 }
 					]
 				});
-				const wp = store.findWorkPackageById('wp-1');
+				const wp = store.findWorkPackageById(testWorkPackageId('wp-1'));
 				expect(wp).toBeDefined();
 				expect(wp?.title).toBe('Test WP');
 			});
 
 			it('should return undefined for non-existent id', () => {
 				const store = createAppStore(initialState);
-				const wp = store.findWorkPackageById('non-existent');
+				const wp = store.findWorkPackageById(testWorkPackageId('non-existent'));
 				expect(wp).toBeUndefined();
 			});
 		});
@@ -61,25 +62,25 @@ describe('appState store', () => {
 
 			it('should add team with custom id', () => {
 				const store = createAppStore(initialState);
-				store.addTeam('New Team', 3.5, 'custom-id');
+				store.addTeam('New Team', 3.5, testTeamId('custom-id'));
 				expect(get(store).teams[0].id).toBe('custom-id');
 			});
 
 			it('should update team', () => {
 				const store = createAppStore({
-					teams: [{ id: 'team-1', name: 'Original', monthlyCapacityInPersonMonths: 5, capacityOverrides: [] }],
+					teams: [{ id: testTeamId('team-1'), name: 'Original', monthlyCapacityInPersonMonths: 5, capacityOverrides: [] }],
 					workPackages: []
 				});
-				store.updateTeam('team-1', { name: 'Updated' });
+				store.updateTeam(testTeamId('team-1'), { name: 'Updated' });
 				expect(get(store).teams[0].name).toBe('Updated');
 			});
 
 			it('should delete team', () => {
 				const store = createAppStore({
-					teams: [{ id: 'team-1', name: 'Test', monthlyCapacityInPersonMonths: 5, capacityOverrides: [] }],
+					teams: [{ id: testTeamId('team-1'), name: 'Test', monthlyCapacityInPersonMonths: 5, capacityOverrides: [] }],
 					workPackages: []
 				});
-				store.deleteTeam('team-1');
+				store.deleteTeam(testTeamId('team-1'));
 				expect(get(store).teams).toHaveLength(0);
 			});
 		});
@@ -87,22 +88,14 @@ describe('appState store', () => {
 		describe('capacity override operations', () => {
 			it('should set monthly capacity', () => {
 				const store = createAppStore({
-					teams: [{ id: 'team-1', name: 'Test', monthlyCapacityInPersonMonths: 5, capacityOverrides: [] }],
+					teams: [{ id: testTeamId('team-1'), name: 'Test', monthlyCapacityInPersonMonths: 5, capacityOverrides: [] }],
 					workPackages: []
 				});
-				store.setMonthlyCapacity('team-1', '2025-01', 3);
+				store.setMonthlyCapacity(testTeamId('team-1'), '2025-01', 3);
 				expect(get(store).teams[0].capacityOverrides).toHaveLength(1);
 				expect(get(store).teams[0].capacityOverrides![0].capacity).toBe(3);
 			});
 
-			it('should clear monthly capacity', () => {
-				const store = createAppStore({
-					teams: [{ id: 'team-1', name: 'Test', monthlyCapacityInPersonMonths: 5, capacityOverrides: [{ yearMonth: '2025-01', capacity: 3 }] }],
-					workPackages: []
-				});
-				store.clearMonthlyCapacity('team-1', '2025-01');
-				expect(get(store).teams[0].capacityOverrides).toHaveLength(0);
-			});
 		});
 
 		describe('work package operations', () => {
@@ -117,16 +110,16 @@ describe('appState store', () => {
 
 			it('should add work package with custom id', () => {
 				const store = createAppStore(initialState);
-				store.addWorkPackage('New WP', 2.5, 'Description', 'custom-wp-id');
+				store.addWorkPackage('New WP', 2.5, 'Description', testWorkPackageId('custom-wp-id'));
 				expect(get(store).workPackages[0].id).toBe('custom-wp-id');
 			});
 
 			it('should update work package', () => {
 				const store = createAppStore({
 					teams: [],
-					workPackages: [{ id: 'wp-1', title: 'Original', sizeInPersonMonths: 1, priority: 0, progressPercent: 0, scheduledPosition: 0 }]
+					workPackages: [{ id: testWorkPackageId('wp-1'), title: 'Original', description: null, sizeInPersonMonths: 1, priority: 0, progressPercent: 0, assignedTeamId: null, scheduledPosition: 0 }]
 				});
-				store.updateWorkPackage('wp-1', { title: 'Updated', sizeInPersonMonths: 3 });
+				store.updateWorkPackage(testWorkPackageId('wp-1'), { title: 'Updated', sizeInPersonMonths: 3 });
 				expect(get(store).workPackages[0].title).toBe('Updated');
 				expect(get(store).workPackages[0].sizeInPersonMonths).toBe(3);
 			});
@@ -134,32 +127,23 @@ describe('appState store', () => {
 			it('should delete work package', () => {
 				const store = createAppStore({
 					teams: [],
-					workPackages: [{ id: 'wp-1', title: 'Test', sizeInPersonMonths: 1, priority: 0, progressPercent: 0, scheduledPosition: 0 }]
+					workPackages: [{ id: testWorkPackageId('wp-1'), title: 'Test', description: null, sizeInPersonMonths: 1, priority: 0, progressPercent: 0, assignedTeamId: null, scheduledPosition: 0 }]
 				});
-				store.deleteWorkPackage('wp-1');
+				store.deleteWorkPackage(testWorkPackageId('wp-1'));
 				expect(get(store).workPackages).toHaveLength(0);
-			});
-
-			it('should assign work package', () => {
-				const store = createAppStore({
-					teams: [],
-					workPackages: [{ id: 'wp-1', title: 'Test', sizeInPersonMonths: 1, priority: 0, progressPercent: 0, scheduledPosition: 0 }]
-				});
-				store.assignWorkPackage('wp-1', 'team-1');
-				expect(get(store).workPackages[0].assignedTeamId).toBe('team-1');
 			});
 
 			it('should batch update work packages', () => {
 				const store = createAppStore({
 					teams: [],
 					workPackages: [
-						{ id: 'wp-1', title: 'WP1', sizeInPersonMonths: 1, priority: 0, progressPercent: 0, scheduledPosition: 0 },
-						{ id: 'wp-2', title: 'WP2', sizeInPersonMonths: 1, priority: 1, progressPercent: 0, scheduledPosition: 1 }
+						{ id: testWorkPackageId('wp-1'), title: 'WP1', description: null, sizeInPersonMonths: 1, priority: 0, progressPercent: 0, assignedTeamId: null, scheduledPosition: 0 },
+						{ id: testWorkPackageId('wp-2'), title: 'WP2', description: null, sizeInPersonMonths: 1, priority: 1, progressPercent: 0, assignedTeamId: null, scheduledPosition: 1 }
 					]
 				});
 				store.batchUpdateWorkPackages([
-					{ id: 'wp-1', assignedTeamId: 'team-1', scheduledPosition: 0 },
-					{ id: 'wp-2', assignedTeamId: 'team-1', scheduledPosition: 1 }
+					{ id: testWorkPackageId('wp-1'), teamId: testTeamId('team-1'), position: 0 },
+					{ id: testWorkPackageId('wp-2'), teamId: testTeamId('team-1'), position: 1 }
 				]);
 				expect(get(store).workPackages[0].assignedTeamId).toBe('team-1');
 				expect(get(store).workPackages[1].assignedTeamId).toBe('team-1');
@@ -169,11 +153,11 @@ describe('appState store', () => {
 				const store = createAppStore({
 					teams: [],
 					workPackages: [
-						{ id: 'wp-1', title: 'WP1', sizeInPersonMonths: 1, priority: 0, progressPercent: 0, scheduledPosition: 5 }
+						{ id: testWorkPackageId('wp-1'), title: 'WP1', description: null, sizeInPersonMonths: 1, priority: 0, progressPercent: 0, assignedTeamId: null, scheduledPosition: 5 }
 					]
 				});
 				store.clearUnassignedScheduledPositions();
-				expect(get(store).workPackages[0].scheduledPosition).toBeUndefined();
+				expect(get(store).workPackages[0].scheduledPosition).toBeNull();
 			});
 		});
 	});
@@ -182,8 +166,8 @@ describe('appState store', () => {
 		it('should derive teams store', () => {
 			const appStore = createAppStore({
 				teams: [
-					{ id: 'team-1', name: 'Team A', monthlyCapacityInPersonMonths: 5, capacityOverrides: [] },
-					{ id: 'team-2', name: 'Team B', monthlyCapacityInPersonMonths: 3, capacityOverrides: [] }
+					{ id: testTeamId('team-1'), name: 'Team A', monthlyCapacityInPersonMonths: 5, capacityOverrides: [] },
+					{ id: testTeamId('team-2'), name: 'Team B', monthlyCapacityInPersonMonths: 3, capacityOverrides: [] }
 				],
 				workPackages: []
 			});
@@ -196,9 +180,9 @@ describe('appState store', () => {
 			const appStore = createAppStore({
 				teams: [],
 				workPackages: [
-					{ id: 'wp-1', title: 'Low Priority', sizeInPersonMonths: 1, priority: 2, progressPercent: 0, scheduledPosition: 0 },
-					{ id: 'wp-2', title: 'High Priority', sizeInPersonMonths: 1, priority: 0, progressPercent: 0, scheduledPosition: 1 },
-					{ id: 'wp-3', title: 'Medium Priority', sizeInPersonMonths: 1, priority: 1, progressPercent: 0, scheduledPosition: 2 }
+					{ id: testWorkPackageId('wp-1'), title: 'Low Priority', description: null, sizeInPersonMonths: 1, priority: 2, progressPercent: 0, assignedTeamId: null, scheduledPosition: 0 },
+					{ id: testWorkPackageId('wp-2'), title: 'High Priority', description: null, sizeInPersonMonths: 1, priority: 0, progressPercent: 0, assignedTeamId: null, scheduledPosition: 1 },
+					{ id: testWorkPackageId('wp-3'), title: 'Medium Priority', description: null, sizeInPersonMonths: 1, priority: 1, progressPercent: 0, assignedTeamId: null, scheduledPosition: 2 }
 				]
 			});
 			const { workPackages } = createDerivedStores(appStore);
@@ -212,8 +196,8 @@ describe('appState store', () => {
 			const appStore = createAppStore({
 				teams: [],
 				workPackages: [
-					{ id: 'wp-1', title: 'Assigned', sizeInPersonMonths: 1, priority: 0, progressPercent: 0, assignedTeamId: 'team-1', scheduledPosition: 0 },
-					{ id: 'wp-2', title: 'Unassigned', sizeInPersonMonths: 1, priority: 1, progressPercent: 0, scheduledPosition: 1 }
+					{ id: testWorkPackageId('wp-1'), title: 'Assigned', description: null, sizeInPersonMonths: 1, priority: 0, progressPercent: 0, assignedTeamId: testTeamId('team-1'), scheduledPosition: 0 },
+					{ id: testWorkPackageId('wp-2'), title: 'Unassigned', description: null, sizeInPersonMonths: 1, priority: 1, progressPercent: 0, assignedTeamId: null, scheduledPosition: 1 }
 				]
 			});
 			const { unassignedWorkPackages } = createDerivedStores(appStore);
@@ -225,8 +209,8 @@ describe('appState store', () => {
 			const appStore = createAppStore({
 				teams: [],
 				workPackages: [
-					{ id: 'wp-1', title: 'Low', sizeInPersonMonths: 1, priority: 2, progressPercent: 0, scheduledPosition: 0 },
-					{ id: 'wp-2', title: 'High', sizeInPersonMonths: 1, priority: 0, progressPercent: 0, scheduledPosition: 1 }
+					{ id: testWorkPackageId('wp-1'), title: 'Low', description: null, sizeInPersonMonths: 1, priority: 2, progressPercent: 0, assignedTeamId: null, scheduledPosition: 0 },
+					{ id: testWorkPackageId('wp-2'), title: 'High', description: null, sizeInPersonMonths: 1, priority: 0, progressPercent: 0, assignedTeamId: null, scheduledPosition: 1 }
 				]
 			});
 			const { unassignedWorkPackages } = createDerivedStores(appStore);

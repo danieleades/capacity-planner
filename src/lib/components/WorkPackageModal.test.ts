@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/svelte';
 import WorkPackageModal from './WorkPackageModal.svelte';
 import type { OptimisticEnhanceAction } from '$lib/types/optimistic';
 import type { PlanningPageData, WorkPackage } from '$lib/types';
+import { testWorkPackageId } from '../../test/utils/test-data';
 
 describe('WorkPackageModal', () => {
 	const mockOptimisticEnhance = vi.fn((_node, _callback) => {
@@ -57,14 +58,14 @@ describe('WorkPackageModal', () => {
 
 		it('should show "Edit Work Package" title when editing existing work package', () => {
 			const editingWorkPackage: WorkPackage = {
-				id: 'wp-1',
+				id: testWorkPackageId('wp-1'),
 				title: 'Test Work Package',
 				description: 'Test description',
 				sizeInPersonMonths: 2.5,
 				priority: 0,
 				progressPercent: 0,
-				assignedTeamId: undefined,
-				scheduledPosition: undefined
+				assignedTeamId: null,
+				scheduledPosition: null
 			};
 
 			render(WorkPackageModal, {
@@ -97,14 +98,14 @@ describe('WorkPackageModal', () => {
 
 		it('should have form with updateWorkPackage action when editing', () => {
 			const editingWorkPackage: WorkPackage = {
-				id: 'wp-1',
+				id: testWorkPackageId('wp-1'),
 				title: 'Test Work Package',
 				description: 'Test description',
 				sizeInPersonMonths: 2.5,
 				priority: 0,
 				progressPercent: 0,
-				assignedTeamId: undefined,
-				scheduledPosition: undefined
+				assignedTeamId: null,
+				scheduledPosition: null
 			};
 
 			const { container } = render(WorkPackageModal, {
@@ -123,14 +124,14 @@ describe('WorkPackageModal', () => {
 
 		it('should include hidden id field when editing', () => {
 			const editingWorkPackage: WorkPackage = {
-				id: 'wp-1',
+				id: testWorkPackageId('wp-1'),
 				title: 'Test Work Package',
 				description: 'Test description',
 				sizeInPersonMonths: 2.5,
 				priority: 0,
 				progressPercent: 0,
-				assignedTeamId: undefined,
-				scheduledPosition: undefined
+				assignedTeamId: null,
+				scheduledPosition: null
 			};
 
 			const { container } = render(WorkPackageModal, {
@@ -165,14 +166,14 @@ describe('WorkPackageModal', () => {
 	describe('form pre-population', () => {
 		it('should pre-populate form fields when editing', () => {
 			const editingWorkPackage: WorkPackage = {
-				id: 'wp-1',
+				id: testWorkPackageId('wp-1'),
 				title: 'Test Work Package',
 				description: 'Test description',
 				sizeInPersonMonths: 2.5,
 				priority: 0,
 				progressPercent: 0,
-				assignedTeamId: undefined,
-				scheduledPosition: undefined
+				assignedTeamId: null,
+				scheduledPosition: null
 			};
 
 			render(WorkPackageModal, {
@@ -254,14 +255,14 @@ describe('WorkPackageModal', () => {
 
 		it('should show "Update Work Package" button when editing', () => {
 			const editingWorkPackage: WorkPackage = {
-				id: 'wp-1',
+				id: testWorkPackageId('wp-1'),
 				title: 'Test Work Package',
 				description: 'Test description',
 				sizeInPersonMonths: 2.5,
 				priority: 0,
 				progressPercent: 0,
-				assignedTeamId: undefined,
-				scheduledPosition: undefined
+				assignedTeamId: null,
+				scheduledPosition: null
 			};
 
 			render(WorkPackageModal, {

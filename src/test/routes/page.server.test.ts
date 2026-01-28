@@ -494,7 +494,7 @@ describe('Planning Page Routes', () => {
 				throw new Error('Expected initialState in result');
 			}
 			const unassignedWorkPackages = view.initialState.workPackages.filter((w: WorkPackage) => !w.assignedTeamId);
-			expect(unassignedWorkPackages[0].description).toBeUndefined();
+			expect(unassignedWorkPackages[0].description).toBeNull();
 		});
 
 		it('should return error when title is missing', async () => {
@@ -867,10 +867,10 @@ describe('Planning Page Routes', () => {
 			
 			expect(loadedWorkPackage).toBeDefined();
 			expect(loadedWorkPackage?.scheduledPosition).toBe(0);
-			expect(loadedWorkPackage?.assignedTeamId).toBeUndefined();
+			expect(loadedWorkPackage?.assignedTeamId).toBeNull();
 		});
 
-		it('should convert null scheduledPosition to undefined', async () => {
+		it('should preserve null scheduledPosition', async () => {
 			const wp = await insertWorkPackage({
 				title: 'Work Package with null position',
 				sizeInPersonMonths: 2.0
@@ -889,7 +889,7 @@ describe('Planning Page Routes', () => {
 			const loadedWorkPackage = result.initialState.workPackages.find((w: WorkPackage) => w.id === wp.id);
 			
 			expect(loadedWorkPackage).toBeDefined();
-			expect(loadedWorkPackage?.scheduledPosition).toBeUndefined();
+			expect(loadedWorkPackage?.scheduledPosition).toBeNull();
 		});
 	});
 
@@ -1189,7 +1189,7 @@ describe('Planning Page Routes', () => {
 				throw new Error('Expected initialState in result');
 			}
 			const unassignedWp = view.initialState.workPackages.find((w: WorkPackage) => w.id === wp.id);
-			expect(unassignedWp?.assignedTeamId).toBeUndefined();
+			expect(unassignedWp?.assignedTeamId).toBeNull();
 		});
 	});
 
@@ -1233,8 +1233,8 @@ describe('Planning Page Routes', () => {
 			const clearedWp1 = view.initialState.workPackages.find((w: WorkPackage) => w.id === wp1.id);
 			const clearedWp2 = view.initialState.workPackages.find((w: WorkPackage) => w.id === wp2.id);
 
-			expect(clearedWp1?.scheduledPosition).toBeUndefined();
-			expect(clearedWp2?.scheduledPosition).toBeUndefined();
+			expect(clearedWp1?.scheduledPosition).toBeNull();
+			expect(clearedWp2?.scheduledPosition).toBeNull();
 		});
 
 		it('should not affect assigned work packages', async () => {
@@ -1362,7 +1362,7 @@ describe('Planning Page Routes', () => {
 				throw new Error('Expected initialState in result');
 			}
 			const updatedWp = view.initialState.workPackages.find((w: WorkPackage) => w.id === wp.id);
-			expect(updatedWp?.description).toBeUndefined();
+			expect(updatedWp?.description).toBeNull();
 		});
 	});
 

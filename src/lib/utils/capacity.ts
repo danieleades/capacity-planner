@@ -1,8 +1,8 @@
-import { YearMonth, type WorkPackage, type Team } from '$lib/types';
+import { YearMonth, type WorkPackage, type Team, type TeamId } from '$lib/types';
 import { CapacityCalendar } from './CapacityCalendar';
 
 export interface TeamBacklogMetrics {
-	teamId: string;
+	teamId: TeamId;
 	totalWorkMonths: number;
 	remainingWorkMonths: number;
 	monthsToComplete: number;
@@ -30,7 +30,7 @@ export function getCapacityForMonth(team: Team, yearMonth: YearMonth | string): 
  * Calculate the total work months for a team's assigned work packages
  */
 export function calculateTotalWorkMonths(
-	teamId: string,
+	teamId: TeamId,
 	workPackages: WorkPackage[]
 ): number {
 	return workPackages
@@ -43,7 +43,7 @@ export function calculateTotalWorkMonths(
  * Takes progress into account
  */
 export function calculateRemainingWorkMonths(
-	teamId: string,
+	teamId: TeamId,
 	workPackages: WorkPackage[]
 ): number {
 	return workPackages
@@ -77,10 +77,10 @@ export function sortByScheduledPosition(workPackages: WorkPackage[]): WorkPackag
  * Returns a map of teamId -> work packages, plus an array of unassigned work packages
  */
 export function groupWorkPackagesByTeam(workPackages: WorkPackage[]): {
-	byTeam: Map<string, WorkPackage[]>;
+	byTeam: Map<TeamId, WorkPackage[]>;
 	unassigned: WorkPackage[];
 } {
-	const byTeam = new Map<string, WorkPackage[]>();
+	const byTeam = new Map<TeamId, WorkPackage[]>();
 	const unassigned: WorkPackage[] = [];
 
 	for (const wp of workPackages) {
@@ -106,18 +106,6 @@ export function groupWorkPackagesByTeam(workPackages: WorkPackage[]): {
  * The returned date reflects the actual day within the month when work completes,
  * based on the fraction of month capacity used.
  */
-export function simulateWorkCompletion(
-	team: Team,
-	totalWorkMonths: number,
-	startDate: Date = new Date()
-): Date | null {
-	if (totalWorkMonths <= 0) return null;
-
-	const calendar = new CapacityCalendar(team, startDate);
-	const { completionDate } = calendar.countMonthsForWork(totalWorkMonths);
-	return completionDate;
-}
-
 /**
  * Calculate backlog metrics for a team with variable capacity support
  * Uses simulation to ensure monthsToComplete matches estimatedCompletionDate

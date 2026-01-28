@@ -1,5 +1,5 @@
 import { writable, derived, get } from 'svelte/store';
-import type { WorkPackage, Team, AppState, StoreReorderUpdate } from '$lib/types';
+import type { WorkPackage, Team, AppState, ReorderUpdate, TeamId, WorkPackageId } from '$lib/types';
 import * as ops from './operations';
 
 // Create the main state store
@@ -16,51 +16,43 @@ export const createAppStore = (initialState?: AppState) => {
 		update,
 
 		// Helper methods
-		findWorkPackageById: (id: string): WorkPackage | undefined => {
+		findWorkPackageById: (id: WorkPackageId): WorkPackage | undefined => {
 			const state = get(store);
 			return state.workPackages.find((wp) => wp.id === id);
 		},
 
 		// Team operations
-		addTeam: (name: string, capacity: number, id?: string) => {
+		addTeam: (name: string, capacity: number, id?: TeamId) => {
 			update((state) => ops.addTeam(state, name, capacity, id));
 		},
 
-		updateTeam: (id: string, updates: Partial<Omit<Team, 'id'>>) => {
+		updateTeam: (id: TeamId, updates: Partial<Omit<Team, 'id'>>) => {
 			update((state) => ops.updateTeam(state, id, updates));
 		},
 
-		deleteTeam: (id: string) => {
+		deleteTeam: (id: TeamId) => {
 			update((state) => ops.deleteTeam(state, id));
 		},
 
 		// Team capacity override operations
-		setMonthlyCapacity: (teamId: string, yearMonth: string, capacity: number) => {
+		setMonthlyCapacity: (teamId: TeamId, yearMonth: string, capacity: number) => {
 			update((state) => ops.setMonthlyCapacity(state, teamId, yearMonth, capacity));
 		},
 
-		clearMonthlyCapacity: (teamId: string, yearMonth: string) => {
-			update((state) => ops.clearMonthlyCapacity(state, teamId, yearMonth));
-		},
-
 		// Work package operations
-		addWorkPackage: (title: string, size: number, description?: string, id?: string) => {
+		addWorkPackage: (title: string, size: number, description?: string, id?: WorkPackageId) => {
 			update((state) => ops.addWorkPackage(state, title, size, description, id));
 		},
 
-		updateWorkPackage: (id: string, updates: Partial<Omit<WorkPackage, 'id'>>) => {
+		updateWorkPackage: (id: WorkPackageId, updates: Partial<Omit<WorkPackage, 'id'>>) => {
 			update((state) => ops.updateWorkPackage(state, id, updates));
 		},
 
-		deleteWorkPackage: (id: string) => {
+		deleteWorkPackage: (id: WorkPackageId) => {
 			update((state) => ops.deleteWorkPackage(state, id));
 		},
 
-		assignWorkPackage: (workPackageId: string, teamId: string | undefined) => {
-			update((state) => ops.assignWorkPackage(state, workPackageId, teamId));
-		},
-
-		batchUpdateWorkPackages: (updates: StoreReorderUpdate[]) => {
+		batchUpdateWorkPackages: (updates: ReorderUpdate[]) => {
 			update((state) => ops.batchUpdateWorkPackages(state, updates));
 		},
 

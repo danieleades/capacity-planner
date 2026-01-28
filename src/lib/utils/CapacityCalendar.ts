@@ -21,13 +21,6 @@ export class CapacityCalendar {
 	}
 
 	/**
-	 * Get the current month
-	 */
-	getCurrentMonth(): YearMonth {
-		return this.currentMonth;
-	}
-
-	/**
 	 * Get the current position as a Date (precise to the day based on fraction consumed)
 	 */
 	toDate(): Date {
