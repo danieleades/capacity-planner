@@ -5,6 +5,7 @@
 	import type { WorkPackage, PlanningPageData, WorkPackageId } from '$lib/types';
 	import { unsafeWorkPackageId } from '$lib/types';
 	import type { OptimisticEnhanceAction } from '$lib/types/optimistic';
+	import { getTeamColor } from '$lib/utils/team-colors';
 	import WorkPackageModal from './WorkPackageModal.svelte';
 
 	interface Props {
@@ -94,8 +95,8 @@ function handleDelete(workPackage: WorkPackage) {
 			</form>
 		{/each}
 		
-		<div class="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
-			<table class="w-full">
+		<div class="inline-block max-w-full overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
+			<table class="min-w-max table-auto">
 				<thead class="border-b border-gray-200 bg-gray-50">
 					<tr>
 						<th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Priority</th>
@@ -130,7 +131,12 @@ function handleDelete(workPackage: WorkPackage) {
 							<td class="px-4 py-3 text-sm text-gray-600">
 								{#if wp.assignedTeamId}
 									{@const team = $appState.teams.find((t) => t.id === wp.assignedTeamId)}
-									<span class="rounded bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800">
+									{@const color = team ? getTeamColor(team.name) : null}
+									<span
+										class={color
+											? `rounded border px-2 py-1 text-xs font-medium ${color.light} ${color.text} ${color.border}`
+											: 'rounded border px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 border-gray-200'}
+									>
 										{team?.name || 'Unknown'}
 									</span>
 								{:else}

@@ -313,7 +313,7 @@
 
 <div class="min-h-screen bg-gray-100">
 	<header class="bg-white shadow">
-		<div class="mx-auto max-w-7xl px-4 py-6">
+		<div class="mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8">
 			<h1 class="text-3xl font-bold text-gray-900">Capacity Planning</h1>
 			<p class="mt-1 text-sm text-gray-600">
 				Plan work packages across teams with capacity-based forecasting
@@ -400,15 +400,27 @@
 		</div>
 	</header>
 
-	<main class="mx-auto max-w-7xl px-4 py-8">
+	<main class="w-full px-4 py-8 sm:px-6 lg:px-8">
 		{#if activeTab === 'board'}
-			<KanbanBoard optimisticEnhance={optimisticEnhance} planningStartDate={planningStartDate} />
+			<div class="mx-auto w-full max-w-[1600px]">
+				<KanbanBoard optimisticEnhance={optimisticEnhance} planningStartDate={planningStartDate} />
+			</div>
 		{:else if activeTab === 'workPackages'}
-			<WorkPackagesTable optimisticEnhance={optimisticEnhance} />
+			<div class="flex justify-center">
+				<div class="w-fit max-w-full">
+					<WorkPackagesTable optimisticEnhance={optimisticEnhance} />
+				</div>
+			</div>
 		{:else if activeTab === 'teams'}
-			<TeamManager optimisticEnhance={optimisticEnhance} />
+			<div class="mx-auto w-full max-w-7xl">
+				<TeamManager optimisticEnhance={optimisticEnhance} />
+			</div>
 		{:else if activeTab === 'gantt'}
-			<GanttChart planningStartDate={planningStartDate} />
+			<div class="flex justify-center">
+				<div class="w-fit max-w-full">
+					<GanttChart planningStartDate={planningStartDate} />
+				</div>
+			</div>
 		{/if}
 	</main>
 </div>

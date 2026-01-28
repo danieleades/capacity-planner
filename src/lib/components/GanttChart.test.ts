@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/svelte';
 import GanttChart from './GanttChart.svelte';
 import { createAppStore, createDerivedStores } from '$lib/stores/appState';
 import type { AppState } from '$lib/types';
+import { getTeamColor } from '$lib/utils/team-colors';
 import { testTeamId, testWorkPackageId } from '../../test/utils/test-data';
 
 describe('GanttChart', () => {
@@ -322,7 +323,8 @@ describe('GanttChart', () => {
 			});
 
 			// Should have a gantt bar with position styling
-			const ganttBar = container.querySelector('.absolute.bg-blue-500');
+			const teamColor = getTeamColor('Engineering');
+			const ganttBar = container.querySelector(`.absolute.${teamColor.bg}`);
 			expect(ganttBar).toBeInTheDocument();
 		});
 
@@ -361,7 +363,8 @@ describe('GanttChart', () => {
 			});
 
 			// Should have two gantt bars
-			const ganttBars = container.querySelectorAll('.absolute.bg-blue-500');
+			const teamColor = getTeamColor('Engineering');
+			const ganttBars = container.querySelectorAll(`.absolute.${teamColor.bg}`);
 			expect(ganttBars.length).toBe(2);
 
 			// First task: 2 PM at 1 PM/month = Jan-Feb (2 months)
@@ -534,7 +537,8 @@ describe('GanttChart', () => {
 			});
 
 			// Completed work package should not show a gantt bar
-			const ganttBars = container.querySelectorAll('.absolute.bg-blue-500');
+			const teamColor = getTeamColor('Engineering');
+			const ganttBars = container.querySelectorAll(`.absolute.${teamColor.bg}`);
 			expect(ganttBars.length).toBe(0);
 		});
 
@@ -563,7 +567,8 @@ describe('GanttChart', () => {
 			});
 
 			// Should have a gantt bar
-			const ganttBar = container.querySelector('.absolute.bg-blue-500');
+			const teamColor = getTeamColor('Engineering');
+			const ganttBar = container.querySelector(`.absolute.${teamColor.bg}`);
 			expect(ganttBar).toBeInTheDocument();
 
 			// 2 PM remaining at 1 PM/month = 2 months (Jan-Feb)
@@ -612,13 +617,16 @@ describe('GanttChart', () => {
 				]
 			});
 
-			// Should have blue bar for first team
-			const blueBar = container.querySelector('.absolute.bg-blue-500');
-			expect(blueBar).toBeInTheDocument();
+			const teamAColor = getTeamColor('Team A');
+			const teamBColor = getTeamColor('Team B');
 
-			// Should have green bar for second team
-			const greenBar = container.querySelector('.absolute.bg-green-500');
-			expect(greenBar).toBeInTheDocument();
+			const teamABar = container.querySelector(`.absolute.${teamAColor.bg}`);
+			expect(teamABar).toBeInTheDocument();
+
+			const teamBBar = container.querySelector(`.absolute.${teamBColor.bg}`);
+			expect(teamBBar).toBeInTheDocument();
+
+			expect(teamAColor.bg).not.toBe(teamBColor.bg);
 		});
 	});
 });

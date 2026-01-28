@@ -100,13 +100,6 @@ export function groupWorkPackagesByTeam(workPackages: WorkPackage[]): {
 }
 
 /**
- * Simulate month-by-month work completion considering variable capacity
- * Returns the estimated completion date (with precise day) or null if work cannot be completed
- *
- * The returned date reflects the actual day within the month when work completes,
- * based on the fraction of month capacity used.
- */
-/**
  * Calculate backlog metrics for a team with variable capacity support
  * Uses simulation to ensure monthsToComplete matches estimatedCompletionDate
  *

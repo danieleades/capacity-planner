@@ -4,6 +4,7 @@
 	import { createAppStore } from '$lib/stores/appState';
 	import { calculateTeamSchedule, type ScheduledWorkPackage } from '$lib/utils/capacity';
 	import { getNextMonthsFrom, getMonthsInRange, formatYearMonth } from '$lib/utils/dates';
+	import { getTeamColor } from '$lib/utils/team-colors';
 	import { YearMonth, type Team } from '$lib/types';
 
 	interface Props {
@@ -22,33 +23,18 @@
 
 	let planningStartMonth = $derived(YearMonth.fromDate(planningStartDate).toString());
 
-	// Team colors for visual distinction
-	const teamColors = [
-		{ bg: 'bg-blue-500', light: 'bg-blue-100', border: 'border-blue-300' },
-		{ bg: 'bg-green-500', light: 'bg-green-100', border: 'border-green-300' },
-		{ bg: 'bg-purple-500', light: 'bg-purple-100', border: 'border-purple-300' },
-		{ bg: 'bg-orange-500', light: 'bg-orange-100', border: 'border-orange-300' },
-		{ bg: 'bg-pink-500', light: 'bg-pink-100', border: 'border-pink-300' },
-		{ bg: 'bg-teal-500', light: 'bg-teal-100', border: 'border-teal-300' },
-	];
-
-	function getTeamColor(index: number) {
-		return teamColors[index % teamColors.length];
-	}
-
 	// Calculate schedules for all teams
 	interface TeamSchedule {
 		team: Team;
 		schedule: ScheduledWorkPackage[];
-		colorIndex: number;
 	}
 
 	let teamSchedules = $derived.by(() => {
 		const schedules: TeamSchedule[] = [];
-		$teams.forEach((team, index) => {
+		$teams.forEach((team) => {
 			const teamWPs = $appState.workPackages.filter((wp) => wp.assignedTeamId === team.id);
 			const schedule = calculateTeamSchedule(team, teamWPs, planningStartDate);
-			schedules.push({ team, schedule, colorIndex: index });
+			schedules.push({ team, schedule });
 		});
 		return schedules;
 	});
@@ -141,8 +127,8 @@
 				</div>
 
 				<!-- Team Rows -->
-				{#each teamSchedules as { team, schedule, colorIndex } (team.id)}
-					{@const color = getTeamColor(colorIndex)}
+				{#each teamSchedules as { team, schedule } (team.id)}
+					{@const color = getTeamColor(team.name)}
 					<!-- Team Header Row -->
 					<div class="flex border-b border-gray-100 bg-gray-50">
 						<div class="w-48 flex-shrink-0 px-3 py-2">
@@ -204,8 +190,8 @@
 				<div class="h-3 w-6 rounded bg-blue-50 border border-blue-200"></div>
 				<span>Planning start</span>
 			</div>
-			{#each teamSchedules as { team, colorIndex } (team.id)}
-				{@const color = getTeamColor(colorIndex)}
+			{#each teamSchedules as { team } (team.id)}
+				{@const color = getTeamColor(team.name)}
 				<div class="flex items-center gap-2">
 					<div class="h-3 w-6 rounded {color.bg}"></div>
 					<span>{team.name}</span>
