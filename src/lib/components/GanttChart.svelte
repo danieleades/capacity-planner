@@ -3,8 +3,15 @@
 	import type { Readable } from 'svelte/store';
 	import { createAppStore } from '$lib/stores/appState';
 	import { calculateTeamSchedule, type ScheduledWorkPackage } from '$lib/utils/capacity';
-	import { getNextMonths, getMonthsInRange, formatYearMonth, getCurrentMonth } from '$lib/utils/dates';
-	import type { Team } from '$lib/types';
+	import { getNextMonthsFrom, getMonthsInRange, formatYearMonth } from '$lib/utils/dates';
+	import { getTeamColor } from '$lib/utils/team-colors';
+	import { YearMonth, type Team } from '$lib/types';
+
+	interface Props {
+		planningStartDate: Date;
+	}
+
+	let { planningStartDate }: Props = $props();
 
 	// Get stores from context
 	const appState = getContext<ReturnType<typeof createAppStore>>('appState');
@@ -14,55 +21,41 @@
 	const MIN_TIMELINE_MONTHS = 6;
 	const COLUMN_WIDTH_PX = 80; // Minimum width per month column
 
-	let currentMonth = $derived(getCurrentMonth());
-
-	// Team colors for visual distinction
-	const teamColors = [
-		{ bg: 'bg-blue-500', light: 'bg-blue-100', border: 'border-blue-300' },
-		{ bg: 'bg-green-500', light: 'bg-green-100', border: 'border-green-300' },
-		{ bg: 'bg-purple-500', light: 'bg-purple-100', border: 'border-purple-300' },
-		{ bg: 'bg-orange-500', light: 'bg-orange-100', border: 'border-orange-300' },
-		{ bg: 'bg-pink-500', light: 'bg-pink-100', border: 'border-pink-300' },
-		{ bg: 'bg-teal-500', light: 'bg-teal-100', border: 'border-teal-300' },
-	];
-
-	function getTeamColor(index: number) {
-		return teamColors[index % teamColors.length];
-	}
+	let planningStartMonth = $derived(YearMonth.fromDate(planningStartDate).toString());
 
 	// Calculate schedules for all teams
 	interface TeamSchedule {
 		team: Team;
 		schedule: ScheduledWorkPackage[];
-		colorIndex: number;
 	}
 
 	let teamSchedules = $derived.by(() => {
 		const schedules: TeamSchedule[] = [];
-		$teams.forEach((team, index) => {
+		$teams.forEach((team) => {
 			const teamWPs = $appState.workPackages.filter((wp) => wp.assignedTeamId === team.id);
-			const schedule = calculateTeamSchedule(team, teamWPs);
-			schedules.push({ team, schedule, colorIndex: index });
+			const schedule = calculateTeamSchedule(team, teamWPs, planningStartDate);
+			schedules.push({ team, schedule });
 		});
 		return schedules;
 	});
 
 	// Calculate timeline range dynamically based on scheduled work
 	let timelineMonths = $derived.by(() => {
-		const startMonth = currentMonth;
+		const startMonth = planningStartMonth;
 
 		// Find the latest end date across all schedules
 		let latestEndMonth = startMonth;
 		for (const { schedule } of teamSchedules) {
 			for (const swp of schedule) {
-				if (swp.endYearMonth > latestEndMonth) {
-					latestEndMonth = swp.endYearMonth;
+				const endYearMonth = YearMonth.fromDate(swp.endDate).toString();
+				if (endYearMonth > latestEndMonth) {
+					latestEndMonth = endYearMonth;
 				}
 			}
 		}
 
 		// Use the range from current month to latest end, with minimum of MIN_TIMELINE_MONTHS
-		const minEndMonths = getNextMonths(MIN_TIMELINE_MONTHS);
+		const minEndMonths = getNextMonthsFrom(planningStartDate, MIN_TIMELINE_MONTHS);
 		const minEndMonth = minEndMonths[minEndMonths.length - 1];
 
 		const effectiveEndMonth = latestEndMonth > minEndMonth ? latestEndMonth : minEndMonth;
@@ -122,7 +115,7 @@
 						{#each timelineMonths as month (month)}
 							<div
 								class="border-l border-gray-200 px-1 py-2 text-center text-xs font-medium {month ===
-								currentMonth
+								planningStartMonth
 									? 'bg-blue-50 text-blue-700'
 									: 'text-gray-600'}"
 								style="width: {COLUMN_WIDTH_PX}px;"
@@ -134,8 +127,8 @@
 				</div>
 
 				<!-- Team Rows -->
-				{#each teamSchedules as { team, schedule, colorIndex } (team.id)}
-					{@const color = getTeamColor(colorIndex)}
+				{#each teamSchedules as { team, schedule } (team.id)}
+					{@const color = getTeamColor(team.name)}
 					<!-- Team Header Row -->
 					<div class="flex border-b border-gray-100 bg-gray-50">
 						<div class="w-48 flex-shrink-0 px-3 py-2">
@@ -147,7 +140,7 @@
 						<div class="relative flex" style="width: {timelineWidth}px;">
 							{#each timelineMonths as month (month)}
 								<div
-									class="border-l border-gray-200 {month === currentMonth ? 'bg-blue-50/50' : ''}"
+									class="border-l border-gray-200 {month === planningStartMonth ? 'bg-blue-50/50' : ''}"
 									style="width: {COLUMN_WIDTH_PX}px;"
 								></div>
 							{/each}
@@ -156,7 +149,9 @@
 
 					<!-- Work Package Rows -->
 					{#each schedule as swp (swp.workPackage.id)}
-						{@const position = calculateBarPosition(swp.startYearMonth, swp.endYearMonth)}
+						{@const startYM = YearMonth.fromDate(swp.startDate).toString()}
+						{@const endYM = YearMonth.fromDate(swp.endDate).toString()}
+						{@const position = calculateBarPosition(startYM, endYM)}
 						<div class="flex border-b border-gray-100 hover:bg-gray-50">
 							<div class="w-48 flex-shrink-0 truncate px-3 py-2 text-sm text-gray-700" title={swp.workPackage.title}>
 								<span class="pl-4">{swp.workPackage.title}</span>
@@ -165,7 +160,7 @@
 								<!-- Grid lines -->
 								{#each timelineMonths as month (month)}
 									<div
-										class="border-l border-gray-200 {month === currentMonth ? 'bg-blue-50/50' : ''}"
+									class="border-l border-gray-200 {month === planningStartMonth ? 'bg-blue-50/50' : ''}"
 										style="width: {COLUMN_WIDTH_PX}px;"
 									></div>
 								{/each}
@@ -175,7 +170,7 @@
 									<div
 										class="absolute top-1 bottom-1 rounded {color.bg} flex items-center justify-center overflow-hidden px-2 text-xs font-medium text-white shadow-sm"
 										style="left: {position.left}; width: {position.width};"
-										title="{swp.workPackage.title}: {formatYearMonth(swp.startYearMonth)} - {formatYearMonth(swp.endYearMonth)}"
+										title="{swp.workPackage.title}: {formatYearMonth(startYM)} - {formatYearMonth(endYM)}"
 									>
 										<span class="truncate">
 											{swp.workPackage.title}
@@ -193,10 +188,10 @@
 		<div class="mt-4 flex flex-wrap items-center gap-4 border-t border-gray-200 pt-4 text-xs text-gray-600">
 			<div class="flex items-center gap-2">
 				<div class="h-3 w-6 rounded bg-blue-50 border border-blue-200"></div>
-				<span>Current month</span>
+				<span>Planning start</span>
 			</div>
-			{#each teamSchedules as { team, colorIndex } (team.id)}
-				{@const color = getTeamColor(colorIndex)}
+			{#each teamSchedules as { team } (team.id)}
+				{@const color = getTeamColor(team.name)}
 				<div class="flex items-center gap-2">
 					<div class="h-3 w-6 rounded {color.bg}"></div>
 					<span>{team.name}</span>

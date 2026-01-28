@@ -58,3 +58,13 @@ export const workPackages = sqliteTable(
 		index('work_packages_priority_idx').on(table.priority)
 	]
 );
+
+/**
+ * Settings table
+ * Key-value store for application settings
+ */
+export const settings = sqliteTable('settings', {
+	key: text('key').primaryKey(),
+	value: text('value').notNull(),
+	updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull()
+});

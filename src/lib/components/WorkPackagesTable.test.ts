@@ -4,6 +4,7 @@ import WorkPackagesTable from './WorkPackagesTable.svelte';
 import { createAppStore, createDerivedStores } from '$lib/stores/appState';
 import type { OptimisticEnhanceAction } from '$lib/types/optimistic';
 import type { PlanningPageData, AppState } from '$lib/types';
+import { testTeamId, testWorkPackageId } from '../../test/utils/test-data';
 
 describe('WorkPackagesTable', () => {
 	const mockOptimisticEnhance = vi.fn((_node, _callback) => {
@@ -55,11 +56,13 @@ describe('WorkPackagesTable', () => {
 				teams: [],
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'Feature A',
+						description: null,
 						sizeInPersonMonths: 2.5,
 						priority: 0,
 						progressPercent: 25,
+						assignedTeamId: null,
 						scheduledPosition: 0
 					}
 				]
@@ -75,11 +78,13 @@ describe('WorkPackagesTable', () => {
 				teams: [],
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'Feature A',
+						description: null,
 						sizeInPersonMonths: 2,
 						priority: 0, // 0-indexed
 						progressPercent: 0,
+						assignedTeamId: null,
 						scheduledPosition: 0
 					}
 				]
@@ -94,19 +99,23 @@ describe('WorkPackagesTable', () => {
 				teams: [],
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'Feature A',
+						description: null,
 						sizeInPersonMonths: 2,
 						priority: 0,
 						progressPercent: 0,
+						assignedTeamId: null,
 						scheduledPosition: 0
 					},
 					{
-						id: 'wp-2',
+						id: testWorkPackageId('wp-2'),
 						title: 'Feature B',
+						description: null,
 						sizeInPersonMonths: 3,
 						priority: 1,
 						progressPercent: 50,
+						assignedTeamId: null,
 						scheduledPosition: 1
 					}
 				]
@@ -121,20 +130,23 @@ describe('WorkPackagesTable', () => {
 				teams: [],
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'With Description',
 						description: 'Test description',
 						sizeInPersonMonths: 2,
 						priority: 0,
 						progressPercent: 0,
+						assignedTeamId: null,
 						scheduledPosition: 0
 					},
 					{
-						id: 'wp-2',
+						id: testWorkPackageId('wp-2'),
 						title: 'Without Description',
+						description: null,
 						sizeInPersonMonths: 2,
 						priority: 1,
 						progressPercent: 0,
+						assignedTeamId: null,
 						scheduledPosition: 1
 					}
 				]
@@ -149,11 +161,13 @@ describe('WorkPackagesTable', () => {
 				teams: [],
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'Feature A',
+						description: null,
 						sizeInPersonMonths: 2,
 						priority: 0,
 						progressPercent: 0,
+						assignedTeamId: null,
 						scheduledPosition: 0
 					}
 				]
@@ -168,7 +182,7 @@ describe('WorkPackagesTable', () => {
 			renderWorkPackagesTable({
 				teams: [
 					{
-						id: 'team-1',
+						id: testTeamId('team-1'),
 						name: 'Platform Team',
 						monthlyCapacityInPersonMonths: 5,
 						capacityOverrides: []
@@ -176,12 +190,13 @@ describe('WorkPackagesTable', () => {
 				],
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'Feature A',
+						description: null,
 						sizeInPersonMonths: 2,
 						priority: 0,
 						progressPercent: 0,
-						assignedTeamId: 'team-1',
+						assignedTeamId: testTeamId('team-1'),
 						scheduledPosition: 0
 					}
 				]
@@ -195,11 +210,13 @@ describe('WorkPackagesTable', () => {
 				teams: [],
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'Feature A',
+						description: null,
 						sizeInPersonMonths: 2,
 						priority: 0,
 						progressPercent: 0,
+						assignedTeamId: null,
 						scheduledPosition: 0
 					}
 				]
@@ -213,12 +230,13 @@ describe('WorkPackagesTable', () => {
 				teams: [], // No teams defined
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'Feature A',
+						description: null,
 						sizeInPersonMonths: 2,
 						priority: 0,
 						progressPercent: 0,
-						assignedTeamId: 'non-existent-team',
+						assignedTeamId: testTeamId('non-existent-team'),
 						scheduledPosition: 0
 					}
 				]
@@ -234,11 +252,13 @@ describe('WorkPackagesTable', () => {
 				teams: [],
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'Feature A',
+						description: null,
 						sizeInPersonMonths: 2,
 						priority: 0,
 						progressPercent: 0,
+						assignedTeamId: null,
 						scheduledPosition: 0
 					}
 				]
@@ -271,11 +291,13 @@ describe('WorkPackagesTable', () => {
 				teams: [],
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'Feature A',
+						description: null,
 						sizeInPersonMonths: 2,
 						priority: 0,
 						progressPercent: 0,
+						assignedTeamId: null,
 						scheduledPosition: 0
 					}
 				]
@@ -290,11 +312,13 @@ describe('WorkPackagesTable', () => {
 				teams: [],
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'Feature A',
+						description: null,
 						sizeInPersonMonths: 2,
 						priority: 0,
 						progressPercent: 0,
+						assignedTeamId: null,
 						scheduledPosition: 0
 					}
 				]
@@ -311,11 +335,13 @@ describe('WorkPackagesTable', () => {
 				teams: [],
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'Feature A',
+						description: null,
 						sizeInPersonMonths: 2,
 						priority: 0,
 						progressPercent: 75,
+						assignedTeamId: null,
 						scheduledPosition: 0
 					}
 				]

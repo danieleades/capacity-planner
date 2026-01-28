@@ -1,7 +1,9 @@
 import { db as defaultDb } from '../db';
-import { teams, capacityOverrides, workPackages } from '../schema';
+import { teams, capacityOverrides, workPackages, settings } from '../schema';
 import type { DbParam } from './types';
 import { dbOperation } from './db-helpers';
+import { eq } from 'drizzle-orm';
+import { scheduledPositionComparator } from '$lib/utils/capacity';
 
 /**
  * Domain model interfaces for planning view
@@ -90,29 +92,13 @@ export function getPlanningView(db: DbParam = defaultDb): PlanningView {
 			}
 		}
 
-		// Sort work packages by scheduled_position within each team
+		// Sort work packages by scheduled position with fallback to priority
 		for (const teamWorkPackages of workPackagesByTeam.values()) {
-			teamWorkPackages.sort((a, b) => {
-				// Handle null positions - put them at the end
-				if (a.scheduledPosition === null && b.scheduledPosition === null) return 0;
-				if (a.scheduledPosition === null) return 1;
-				if (b.scheduledPosition === null) return -1;
-				return a.scheduledPosition - b.scheduledPosition;
-			});
+			teamWorkPackages.sort(scheduledPositionComparator);
 		}
 
 		// Sort unassigned work packages by scheduledPosition (if set), otherwise by priority
-		unassignedWorkPackages.sort((a, b) => {
-			// Both have scheduled positions - use those
-			if (a.scheduledPosition !== null && b.scheduledPosition !== null) {
-				return a.scheduledPosition - b.scheduledPosition;
-			}
-			// One has scheduled position - it comes first
-			if (a.scheduledPosition !== null) return -1;
-			if (b.scheduledPosition !== null) return 1;
-			// Neither has scheduled position - fall back to priority
-			return a.priority - b.priority;
-		});
+		unassignedWorkPackages.sort(scheduledPositionComparator);
 
 		// Transform teams into domain models
 		const teamModels: Team[] = allTeams.map((team) => ({
@@ -128,4 +114,45 @@ export function getPlanningView(db: DbParam = defaultDb): PlanningView {
 			unassignedWorkPackages
 		};
 	}, 'Failed to get planning view');
+}
+
+const PLANNING_START_DATE_KEY = 'planning_start_date';
+
+/**
+ * Get the planning start date from settings
+ * Returns the stored date string in YYYY-MM-DD format, or null if not set
+ */
+export function getPlanningStartDate(db: DbParam = defaultDb): string | null {
+	return dbOperation(() => {
+		const result = db
+			.select({ value: settings.value })
+			.from(settings)
+			.where(eq(settings.key, PLANNING_START_DATE_KEY))
+			.get();
+		return result?.value ?? null;
+	}, 'Failed to get planning start date');
+}
+
+/**
+ * Set the planning start date in settings
+ * @param dateStr - Date string in YYYY-MM-DD format
+ */
+export function setPlanningStartDate(dateStr: string, db: DbParam = defaultDb): void {
+	dbOperation(() => {
+		const now = new Date();
+		db.insert(settings)
+			.values({
+				key: PLANNING_START_DATE_KEY,
+				value: dateStr,
+				updatedAt: now
+			})
+			.onConflictDoUpdate({
+				target: settings.key,
+				set: {
+					value: dateStr,
+					updatedAt: now
+				}
+			})
+			.run();
+	}, 'Failed to set planning start date');
 }

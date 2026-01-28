@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { sql } from 'drizzle-orm';
-import { teams, capacityOverrides, workPackages } from '$lib/server/schema';
+import { teams, capacityOverrides, workPackages, settings } from '$lib/server/schema';
 
 /**
  * Create an in-memory test database with schema applied
@@ -65,6 +65,14 @@ export function createTestDb() {
 		CREATE INDEX work_packages_priority_idx ON work_packages(priority)
 	`);
 
+	db.run(sql`
+		CREATE TABLE settings (
+			key TEXT PRIMARY KEY NOT NULL,
+			value TEXT NOT NULL,
+			updated_at INTEGER NOT NULL
+		)
+	`);
+
 	return { db, sqlite };
 }
 
@@ -76,6 +84,7 @@ export function clearTestDb(db: ReturnType<typeof drizzle>) {
 	db.delete(capacityOverrides).run();
 	db.delete(workPackages).run();
 	db.delete(teams).run();
+	db.delete(settings).run();
 }
 
 /**

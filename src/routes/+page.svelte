@@ -3,7 +3,7 @@
 	import { page } from '$app/stores';
 	import { optimistikit } from 'optimistikit';
 	import { enhance as svelteKitEnhance } from '$app/forms';
-	import { SvelteMap } from 'svelte/reactivity';
+	import { SvelteMap, SvelteDate } from 'svelte/reactivity';
 	import type { PageData } from './$types';
 	import type { ActionResult } from '@sveltejs/kit';
 	import TeamManager from '$lib/components/TeamManager.svelte';
@@ -12,6 +12,7 @@
 	import GanttChart from '$lib/components/GanttChart.svelte';
 	import ErrorBanner from '$lib/components/ErrorBanner.svelte';
 	import { createAppStore, createDerivedStores } from '$lib/stores/appState';
+	import { unsafeTeamId, unsafeWorkPackageId } from '$lib/types';
 
 	// Get page data as props - data stays reactive for optimistikit
 	const { data }: { data: PageData } = $props();
@@ -19,6 +20,108 @@
 	let activeTab = $state<'board' | 'workPackages' | 'teams' | 'gantt'>('board');
 	let errorMessage = $state<string>('');
 	let lastFailedAction = $state<(() => void) | null>(null);
+
+	/** Format a Date as YYYY-MM-DD for input fields */
+	function formatDateForInput(date: Date): string {
+		const year = date.getFullYear();
+		const month = String(date.getMonth() + 1).padStart(2, '0');
+		const day = String(date.getDate()).padStart(2, '0');
+		return `${year}-${month}-${day}`;
+	}
+
+	/** Parse YYYY-MM-DD string to Date, returns null if invalid */
+	function parseDateInput(value: string): Date | null {
+		const [yearStr, monthStr, dayStr] = value.split('-');
+		const year = Number(yearStr);
+		const month = Number(monthStr);
+		const day = Number(dayStr);
+		if (!year || !month || !day) return null;
+		const date = new Date(year, month - 1, day);
+		if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+			return null;
+		}
+		return date;
+	}
+
+	/**
+	 * Convert server data's planningStartDate to a Date object.
+	 * SvelteKit serializes Date objects to ISO strings during SSR/hydration,
+	 * so we need to parse them back to Date objects on the client.
+	 */
+	function toDate(value: Date | string): Date {
+		if (value instanceof Date) return value;
+		// Handle ISO string from SSR serialization
+		return new Date(value);
+	}
+
+	// Planning start date - the actual Date object used by components
+	// Initialize as placeholder; $effect below will set the real value synchronously on mount
+	let planningStartDate: Date = $state(new Date());
+
+	// String representation for the input field
+	let planningStartDateInput: string = $state('');
+
+	// Debounced save to server when planning start date changes
+	let saveTimeout: ReturnType<typeof setTimeout> | null = null;
+	let lastSavedTimestamp: number = $state(0);
+
+	// Sync from server data on mount and when data changes
+	// This runs synchronously on mount, so the placeholder values above are never visible
+	$effect(() => {
+		const serverDate = toDate(data.planningStartDate);
+		planningStartDate = serverDate;
+		planningStartDateInput = formatDateForInput(serverDate);
+		lastSavedTimestamp = serverDate.getTime();
+	});
+
+	// Update the Date when input changes
+	function handleDateInputChange(value: string) {
+		planningStartDateInput = value;
+		const parsed = parseDateInput(value);
+		if (parsed) {
+			planningStartDate = parsed;
+		}
+	}
+
+	const today = new SvelteDate();
+	const planningStartIsPast = $derived.by(() => {
+		const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+		const start = new Date(
+			planningStartDate.getFullYear(),
+			planningStartDate.getMonth(),
+			planningStartDate.getDate()
+		);
+		return start < todayMidnight;
+	});
+
+	$effect(() => {
+		const currentTimestamp = planningStartDate.getTime();
+		// Skip if unchanged from last saved value
+		if (currentTimestamp === lastSavedTimestamp) return;
+
+		// Clear any pending save
+		if (saveTimeout) {
+			clearTimeout(saveTimeout);
+		}
+
+		// Debounce save by 500ms
+		saveTimeout = setTimeout(async () => {
+			const dateToSave = formatDateForInput(planningStartDate);
+			try {
+				const formData = new FormData();
+				formData.append('date', dateToSave);
+				const response = await fetch('?/updatePlanningStartDate', {
+					method: 'POST',
+					body: formData
+				});
+				if (response.ok) {
+					lastSavedTimestamp = planningStartDate.getTime();
+				}
+			} catch {
+				// Silently fail - user can still work with local value
+			}
+		}, 500);
+	});
 
 	// Snapshot storage for rollback handling
 	// Maps form submission ID to snapshot of state before optimistic update
@@ -115,9 +218,9 @@
 				const pendingId = getIdFromForm(formData);
 				if (pendingId) {
 					if (actionType === 'create-work-package') {
-						appState.deleteWorkPackage(pendingId);
+						appState.deleteWorkPackage(unsafeWorkPackageId(pendingId));
 					} else {
-						appState.deleteTeam(pendingId);
+						appState.deleteTeam(unsafeTeamId(pendingId));
 					}
 				}
 				break;
@@ -210,7 +313,7 @@
 
 <div class="min-h-screen bg-gray-100">
 	<header class="bg-white shadow">
-		<div class="mx-auto max-w-7xl px-4 py-6">
+		<div class="mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8">
 			<h1 class="text-3xl font-bold text-gray-900">Capacity Planning</h1>
 			<p class="mt-1 text-sm text-gray-600">
 				Plan work packages across teams with capacity-based forecasting
@@ -265,18 +368,59 @@
 					</button>
 				</nav>
 			</div>
+
+			<div class="mt-4 flex flex-wrap items-center gap-3 text-sm text-gray-600">
+				<label class="flex items-center gap-2">
+					<span class="font-medium text-gray-700">Planning start</span>
+					<input
+						type="date"
+						class="rounded border border-gray-300 px-2 py-1 text-sm text-gray-700"
+						value={planningStartDateInput}
+						oninput={(e) => handleDateInputChange(e.currentTarget.value)}
+					/>
+				</label>
+				<button
+					type="button"
+					class="rounded border border-gray-300 px-2 py-1 text-sm text-gray-700 hover:bg-gray-100"
+					onclick={() => {
+						const todayDate = new Date();
+						const todayMidnight = new Date(todayDate.getFullYear(), todayDate.getMonth(), todayDate.getDate());
+						planningStartDate = todayMidnight;
+						planningStartDateInput = formatDateForInput(todayMidnight);
+					}}
+				>
+					Today
+				</button>
+				{#if planningStartIsPast}
+					<span class="rounded border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-700">
+						Start date is in the past
+					</span>
+				{/if}
+			</div>
 		</div>
 	</header>
 
-	<main class="mx-auto max-w-7xl px-4 py-8">
+	<main class="w-full px-4 py-8 sm:px-6 lg:px-8">
 		{#if activeTab === 'board'}
-			<KanbanBoard optimisticEnhance={optimisticEnhance} />
+			<div class="mx-auto w-full max-w-[1600px]">
+				<KanbanBoard optimisticEnhance={optimisticEnhance} planningStartDate={planningStartDate} />
+			</div>
 		{:else if activeTab === 'workPackages'}
-			<WorkPackagesTable optimisticEnhance={optimisticEnhance} />
+			<div class="flex justify-center">
+				<div class="w-fit max-w-full">
+					<WorkPackagesTable optimisticEnhance={optimisticEnhance} />
+				</div>
+			</div>
 		{:else if activeTab === 'teams'}
-			<TeamManager optimisticEnhance={optimisticEnhance} />
+			<div class="mx-auto w-full max-w-7xl">
+				<TeamManager optimisticEnhance={optimisticEnhance} />
+			</div>
 		{:else if activeTab === 'gantt'}
-			<GanttChart />
+			<div class="flex justify-center">
+				<div class="w-fit max-w-full">
+					<GanttChart planningStartDate={planningStartDate} />
+				</div>
+			</div>
 		{/if}
 	</main>
 </div>

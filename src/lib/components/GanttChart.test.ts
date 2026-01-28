@@ -3,6 +3,8 @@ import { render, screen } from '@testing-library/svelte';
 import GanttChart from './GanttChart.svelte';
 import { createAppStore, createDerivedStores } from '$lib/stores/appState';
 import type { AppState } from '$lib/types';
+import { getTeamColor } from '$lib/utils/team-colors';
+import { testTeamId, testWorkPackageId } from '../../test/utils/test-data';
 
 describe('GanttChart', () => {
 	let initialState: AppState;
@@ -26,7 +28,9 @@ describe('GanttChart', () => {
 	function renderGanttChart(state: AppState = initialState) {
 		const appState = createAppStore(state);
 		const { teams } = createDerivedStores(appState);
+		const planningStartDate = new Date();
 		return render(GanttChart, {
+			props: { planningStartDate },
 			context: new Map<string, unknown>([
 				['appState', appState],
 				['teams', teams]
@@ -46,7 +50,7 @@ describe('GanttChart', () => {
 			renderGanttChart({
 				teams: [
 					{
-						id: 'team-1',
+						id: testTeamId('team-1'),
 						name: 'Engineering',
 						monthlyCapacityInPersonMonths: 5,
 						capacityOverrides: []
@@ -62,7 +66,7 @@ describe('GanttChart', () => {
 			renderGanttChart({
 				teams: [
 					{
-						id: 'team-1',
+						id: testTeamId('team-1'),
 						name: 'Engineering',
 						monthlyCapacityInPersonMonths: 5,
 						capacityOverrides: []
@@ -70,12 +74,13 @@ describe('GanttChart', () => {
 				],
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'Unassigned Work',
+						description: null,
 						sizeInPersonMonths: 2,
 						priority: 0,
 						progressPercent: 0,
-						assignedTeamId: undefined,
+						assignedTeamId: null,
 						scheduledPosition: 0
 					}
 				]
@@ -90,7 +95,7 @@ describe('GanttChart', () => {
 			renderGanttChart({
 				teams: [
 					{
-						id: 'team-1',
+						id: testTeamId('team-1'),
 						name: 'Engineering',
 						monthlyCapacityInPersonMonths: 5,
 						capacityOverrides: []
@@ -98,12 +103,13 @@ describe('GanttChart', () => {
 				],
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'Feature A',
+						description: null,
 						sizeInPersonMonths: 2,
 						priority: 0,
 						progressPercent: 0,
-						assignedTeamId: 'team-1',
+						assignedTeamId: testTeamId('team-1'),
 						scheduledPosition: 0
 					}
 				]
@@ -115,11 +121,11 @@ describe('GanttChart', () => {
 			expect(screen.getByText(/Mar 2025/)).toBeInTheDocument();
 		});
 
-		it('should highlight current month in header', () => {
+		it('should highlight planning start month in header', () => {
 			const { container } = renderGanttChart({
 				teams: [
 					{
-						id: 'team-1',
+						id: testTeamId('team-1'),
 						name: 'Engineering',
 						monthlyCapacityInPersonMonths: 5,
 						capacityOverrides: []
@@ -127,18 +133,19 @@ describe('GanttChart', () => {
 				],
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'Feature A',
+						description: null,
 						sizeInPersonMonths: 2,
 						priority: 0,
 						progressPercent: 0,
-						assignedTeamId: 'team-1',
+						assignedTeamId: testTeamId('team-1'),
 						scheduledPosition: 0
 					}
 				]
 			});
 
-			// Current month should have special styling
+			// Planning start month should have special styling
 			const currentMonthHeader = container.querySelector('.bg-blue-50.text-blue-700');
 			expect(currentMonthHeader).toBeInTheDocument();
 			expect(currentMonthHeader?.textContent).toMatch(/Jan 2025/);
@@ -150,7 +157,7 @@ describe('GanttChart', () => {
 			renderGanttChart({
 				teams: [
 					{
-						id: 'team-1',
+						id: testTeamId('team-1'),
 						name: 'Platform Team',
 						monthlyCapacityInPersonMonths: 5,
 						capacityOverrides: []
@@ -158,21 +165,23 @@ describe('GanttChart', () => {
 				],
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'Feature A',
+						description: null,
 						sizeInPersonMonths: 2,
 						priority: 0,
 						progressPercent: 0,
-						assignedTeamId: 'team-1',
+						assignedTeamId: testTeamId('team-1'),
 						scheduledPosition: 0
 					},
 					{
-						id: 'wp-2',
+						id: testWorkPackageId('wp-2'),
 						title: 'Feature B',
+						description: null,
 						sizeInPersonMonths: 3,
 						priority: 1,
 						progressPercent: 0,
-						assignedTeamId: 'team-1',
+						assignedTeamId: testTeamId('team-1'),
 						scheduledPosition: 1
 					}
 				]
@@ -188,7 +197,7 @@ describe('GanttChart', () => {
 			renderGanttChart({
 				teams: [
 					{
-						id: 'team-1',
+						id: testTeamId('team-1'),
 						name: 'Platform Team',
 						monthlyCapacityInPersonMonths: 5,
 						capacityOverrides: []
@@ -196,12 +205,13 @@ describe('GanttChart', () => {
 				],
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'Feature A',
+						description: null,
 						sizeInPersonMonths: 2,
 						priority: 0,
 						progressPercent: 0,
-						assignedTeamId: 'team-1',
+						assignedTeamId: testTeamId('team-1'),
 						scheduledPosition: 0
 					}
 				]
@@ -214,13 +224,13 @@ describe('GanttChart', () => {
 			renderGanttChart({
 				teams: [
 					{
-						id: 'team-1',
+						id: testTeamId('team-1'),
 						name: 'Platform Team',
 						monthlyCapacityInPersonMonths: 5,
 						capacityOverrides: []
 					},
 					{
-						id: 'team-2',
+						id: testTeamId('team-2'),
 						name: 'Mobile Team',
 						monthlyCapacityInPersonMonths: 3,
 						capacityOverrides: []
@@ -228,21 +238,23 @@ describe('GanttChart', () => {
 				],
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'Feature A',
+						description: null,
 						sizeInPersonMonths: 2,
 						priority: 0,
 						progressPercent: 0,
-						assignedTeamId: 'team-1',
+						assignedTeamId: testTeamId('team-1'),
 						scheduledPosition: 0
 					},
 					{
-						id: 'wp-2',
+						id: testWorkPackageId('wp-2'),
 						title: 'Feature B',
+						description: null,
 						sizeInPersonMonths: 3,
 						priority: 1,
 						progressPercent: 0,
-						assignedTeamId: 'team-2',
+						assignedTeamId: testTeamId('team-2'),
 						scheduledPosition: 0
 					}
 				]
@@ -261,7 +273,7 @@ describe('GanttChart', () => {
 			renderGanttChart({
 				teams: [
 					{
-						id: 'team-1',
+						id: testTeamId('team-1'),
 						name: 'Engineering',
 						monthlyCapacityInPersonMonths: 5,
 						capacityOverrides: []
@@ -269,12 +281,13 @@ describe('GanttChart', () => {
 				],
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'Authentication System',
+						description: null,
 						sizeInPersonMonths: 2,
 						priority: 0,
 						progressPercent: 0,
-						assignedTeamId: 'team-1',
+						assignedTeamId: testTeamId('team-1'),
 						scheduledPosition: 0
 					}
 				]
@@ -289,7 +302,7 @@ describe('GanttChart', () => {
 			const { container } = renderGanttChart({
 				teams: [
 					{
-						id: 'team-1',
+						id: testTeamId('team-1'),
 						name: 'Engineering',
 						monthlyCapacityInPersonMonths: 5,
 						capacityOverrides: []
@@ -297,19 +310,21 @@ describe('GanttChart', () => {
 				],
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'Feature Work',
+						description: null,
 						sizeInPersonMonths: 2,
 						priority: 0,
 						progressPercent: 0,
-						assignedTeamId: 'team-1',
+						assignedTeamId: testTeamId('team-1'),
 						scheduledPosition: 0
 					}
 				]
 			});
 
 			// Should have a gantt bar with position styling
-			const ganttBar = container.querySelector('.absolute.bg-blue-500');
+			const teamColor = getTeamColor('Engineering');
+			const ganttBar = container.querySelector(`.absolute.${teamColor.bg}`);
 			expect(ganttBar).toBeInTheDocument();
 		});
 
@@ -317,7 +332,7 @@ describe('GanttChart', () => {
 			const { container } = renderGanttChart({
 				teams: [
 					{
-						id: 'team-1',
+						id: testTeamId('team-1'),
 						name: 'Engineering',
 						monthlyCapacityInPersonMonths: 1,
 						capacityOverrides: []
@@ -325,28 +340,31 @@ describe('GanttChart', () => {
 				],
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'First Task',
+						description: null,
 						sizeInPersonMonths: 2,
 						priority: 0,
 						progressPercent: 0,
-						assignedTeamId: 'team-1',
+						assignedTeamId: testTeamId('team-1'),
 						scheduledPosition: 0
 					},
 					{
-						id: 'wp-2',
+						id: testWorkPackageId('wp-2'),
 						title: 'Second Task',
+						description: null,
 						sizeInPersonMonths: 1,
 						priority: 1,
 						progressPercent: 0,
-						assignedTeamId: 'team-1',
+						assignedTeamId: testTeamId('team-1'),
 						scheduledPosition: 1
 					}
 				]
 			});
 
 			// Should have two gantt bars
-			const ganttBars = container.querySelectorAll('.absolute.bg-blue-500');
+			const teamColor = getTeamColor('Engineering');
+			const ganttBars = container.querySelectorAll(`.absolute.${teamColor.bg}`);
 			expect(ganttBars.length).toBe(2);
 
 			// First task: 2 PM at 1 PM/month = Jan-Feb (2 months)
@@ -363,7 +381,7 @@ describe('GanttChart', () => {
 				renderGanttChart({
 				teams: [
 					{
-						id: 'team-1',
+						id: testTeamId('team-1'),
 						name: 'Engineering',
 						monthlyCapacityInPersonMonths: 1,
 						capacityOverrides: []
@@ -371,12 +389,13 @@ describe('GanttChart', () => {
 				],
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'Long Project',
+						description: null,
 						sizeInPersonMonths: 12,
 						priority: 0,
 						progressPercent: 0,
-						assignedTeamId: 'team-1',
+						assignedTeamId: testTeamId('team-1'),
 						scheduledPosition: 0
 					}
 				]
@@ -391,7 +410,7 @@ describe('GanttChart', () => {
 			renderGanttChart({
 				teams: [
 					{
-						id: 'team-1',
+						id: testTeamId('team-1'),
 						name: 'Engineering',
 						monthlyCapacityInPersonMonths: 10,
 						capacityOverrides: []
@@ -399,12 +418,13 @@ describe('GanttChart', () => {
 				],
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'Quick Task',
+						description: null,
 						sizeInPersonMonths: 0.5,
 						priority: 0,
 						progressPercent: 0,
-						assignedTeamId: 'team-1',
+						assignedTeamId: testTeamId('team-1'),
 						scheduledPosition: 0
 					}
 				]
@@ -416,11 +436,11 @@ describe('GanttChart', () => {
 	});
 
 	describe('legend', () => {
-		it('should show current month indicator in legend', () => {
+		it('should show planning start indicator in legend', () => {
 			renderGanttChart({
 				teams: [
 					{
-						id: 'team-1',
+						id: testTeamId('team-1'),
 						name: 'Engineering',
 						monthlyCapacityInPersonMonths: 5,
 						capacityOverrides: []
@@ -428,31 +448,32 @@ describe('GanttChart', () => {
 				],
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'Feature A',
+						description: null,
 						sizeInPersonMonths: 2,
 						priority: 0,
 						progressPercent: 0,
-						assignedTeamId: 'team-1',
+						assignedTeamId: testTeamId('team-1'),
 						scheduledPosition: 0
 					}
 				]
 			});
 
-			expect(screen.getByText('Current month')).toBeInTheDocument();
+			expect(screen.getByText('Planning start')).toBeInTheDocument();
 		});
 
 		it('should show team colors in legend', () => {
 			renderGanttChart({
 				teams: [
 					{
-						id: 'team-1',
+						id: testTeamId('team-1'),
 						name: 'Platform Team',
 						monthlyCapacityInPersonMonths: 5,
 						capacityOverrides: []
 					},
 					{
-						id: 'team-2',
+						id: testTeamId('team-2'),
 						name: 'Mobile Team',
 						monthlyCapacityInPersonMonths: 3,
 						capacityOverrides: []
@@ -460,21 +481,23 @@ describe('GanttChart', () => {
 				],
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'Feature A',
+						description: null,
 						sizeInPersonMonths: 2,
 						priority: 0,
 						progressPercent: 0,
-						assignedTeamId: 'team-1',
+						assignedTeamId: testTeamId('team-1'),
 						scheduledPosition: 0
 					},
 					{
-						id: 'wp-2',
+						id: testWorkPackageId('wp-2'),
 						title: 'Feature B',
+						description: null,
 						sizeInPersonMonths: 3,
 						priority: 1,
 						progressPercent: 0,
-						assignedTeamId: 'team-2',
+						assignedTeamId: testTeamId('team-2'),
 						scheduledPosition: 0
 					}
 				]
@@ -493,7 +516,7 @@ describe('GanttChart', () => {
 			const { container } = renderGanttChart({
 				teams: [
 					{
-						id: 'team-1',
+						id: testTeamId('team-1'),
 						name: 'Engineering',
 						monthlyCapacityInPersonMonths: 5,
 						capacityOverrides: []
@@ -501,19 +524,21 @@ describe('GanttChart', () => {
 				],
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'Completed Task',
+						description: null,
 						sizeInPersonMonths: 2,
 						priority: 0,
 						progressPercent: 100,
-						assignedTeamId: 'team-1',
+						assignedTeamId: testTeamId('team-1'),
 						scheduledPosition: 0
 					}
 				]
 			});
 
 			// Completed work package should not show a gantt bar
-			const ganttBars = container.querySelectorAll('.absolute.bg-blue-500');
+			const teamColor = getTeamColor('Engineering');
+			const ganttBars = container.querySelectorAll(`.absolute.${teamColor.bg}`);
 			expect(ganttBars.length).toBe(0);
 		});
 
@@ -521,7 +546,7 @@ describe('GanttChart', () => {
 			const { container } = renderGanttChart({
 				teams: [
 					{
-						id: 'team-1',
+						id: testTeamId('team-1'),
 						name: 'Engineering',
 						monthlyCapacityInPersonMonths: 1,
 						capacityOverrides: []
@@ -529,19 +554,21 @@ describe('GanttChart', () => {
 				],
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'Partial Progress',
+						description: null,
 						sizeInPersonMonths: 4,
 						priority: 0,
 						progressPercent: 50, // 2 PM remaining
-						assignedTeamId: 'team-1',
+						assignedTeamId: testTeamId('team-1'),
 						scheduledPosition: 0
 					}
 				]
 			});
 
 			// Should have a gantt bar
-			const ganttBar = container.querySelector('.absolute.bg-blue-500');
+			const teamColor = getTeamColor('Engineering');
+			const ganttBar = container.querySelector(`.absolute.${teamColor.bg}`);
 			expect(ganttBar).toBeInTheDocument();
 
 			// 2 PM remaining at 1 PM/month = 2 months (Jan-Feb)
@@ -554,13 +581,13 @@ describe('GanttChart', () => {
 			const { container } = renderGanttChart({
 				teams: [
 					{
-						id: 'team-1',
+						id: testTeamId('team-1'),
 						name: 'Team A',
 						monthlyCapacityInPersonMonths: 5,
 						capacityOverrides: []
 					},
 					{
-						id: 'team-2',
+						id: testTeamId('team-2'),
 						name: 'Team B',
 						monthlyCapacityInPersonMonths: 5,
 						capacityOverrides: []
@@ -568,33 +595,38 @@ describe('GanttChart', () => {
 				],
 				workPackages: [
 					{
-						id: 'wp-1',
+						id: testWorkPackageId('wp-1'),
 						title: 'Task A',
+						description: null,
 						sizeInPersonMonths: 1,
 						priority: 0,
 						progressPercent: 0,
-						assignedTeamId: 'team-1',
+						assignedTeamId: testTeamId('team-1'),
 						scheduledPosition: 0
 					},
 					{
-						id: 'wp-2',
+						id: testWorkPackageId('wp-2'),
 						title: 'Task B',
+						description: null,
 						sizeInPersonMonths: 1,
 						priority: 0,
 						progressPercent: 0,
-						assignedTeamId: 'team-2',
+						assignedTeamId: testTeamId('team-2'),
 						scheduledPosition: 0
 					}
 				]
 			});
 
-			// Should have blue bar for first team
-			const blueBar = container.querySelector('.absolute.bg-blue-500');
-			expect(blueBar).toBeInTheDocument();
+			const teamAColor = getTeamColor('Team A');
+			const teamBColor = getTeamColor('Team B');
 
-			// Should have green bar for second team
-			const greenBar = container.querySelector('.absolute.bg-green-500');
-			expect(greenBar).toBeInTheDocument();
+			const teamABar = container.querySelector(`.absolute.${teamAColor.bg}`);
+			expect(teamABar).toBeInTheDocument();
+
+			const teamBBar = container.querySelector(`.absolute.${teamBColor.bg}`);
+			expect(teamBBar).toBeInTheDocument();
+
+			expect(teamAColor.bg).not.toBe(teamBColor.bg);
 		});
 	});
 });

@@ -3,12 +3,12 @@ import { getContext } from 'svelte';
 import type { Readable } from 'svelte/store';
 import { createAppStore } from '$lib/stores/appState';
 import type { OptimisticEnhanceAction } from '$lib/types/optimistic';
-import type { Team, PlanningPageData } from '$lib/types';
+import type { Team, PlanningPageData, TeamId } from '$lib/types';
+import { unsafeTeamId, generateTeamId } from '$lib/types';
 import Modal from './Modal.svelte';
 import FormError from './FormError.svelte';
 import CapacitySparkline from './CapacitySparkline.svelte';
 import { getNextMonths, formatYearMonth } from '$lib/utils/dates';
-import { generateId } from '$lib/utils/id';
 
 // Configuration
 const COLUMN_WIDTH_PX = 100; // Width per month column
@@ -27,32 +27,33 @@ const teams = getContext<Readable<Team[]>>('teams');
 const capacityMonths = getNextMonths(12);
 
 let showAddModal = $state(false);
-	let editingTeam = $state<string | null>(null);
+	let editingTeam = $state<TeamId | null>(null);
 	let formName = $state('');
-	let formCapacity = $state(0);
+	let formCapacity = $state('0');
 	let nameError = $state<string | null>(null);
 	let capacityError = $state<string | null>(null);
 	let teamFormRef = $state<HTMLFormElement | null>(null);
-let newTeamId = $state<string>(generateId());
+let newTeamId = $state(generateTeamId());
+	let isSubmitting = $state(false);
 
 function openAddModal() {
 	formName = '';
-	formCapacity = 0;
+	formCapacity = '0';
 	editingTeam = null;
 	nameError = null;
 	capacityError = null;
-	newTeamId = generateId();
+	newTeamId = generateTeamId();
 	showAddModal = true;
 }
 
-function openEditModal(teamId: string) {
+function openEditModal(teamId: TeamId) {
 	const team = $teams.find((t) => t.id === teamId);
 	if (!team) {
 		return;
 	}
 
 	formName = team.name;
-	formCapacity = team.monthlyCapacityInPersonMonths;
+	formCapacity = String(team.monthlyCapacityInPersonMonths);
 	editingTeam = teamId;
 	nameError = null;
 	capacityError = null;
@@ -63,10 +64,10 @@ function openEditModal(teamId: string) {
 		showAddModal = false;
 	editingTeam = null;
 	formName = '';
-	formCapacity = 0;
+	formCapacity = '0';
 	nameError = null;
 	capacityError = null;
-	newTeamId = generateId();
+	newTeamId = generateTeamId();
 	}
 
 	function validateForm(): boolean {
@@ -83,15 +84,33 @@ function openEditModal(teamId: string) {
 			isValid = false;
 		}
 
-		if (isNaN(formCapacity)) {
+		const trimmedCapacity = formCapacity.trim();
+		const parsedCapacity = Number.parseFloat(trimmedCapacity);
+		if (trimmedCapacity.length === 0 || Number.isNaN(parsedCapacity)) {
 			capacityError = 'Capacity must be a valid number';
 			isValid = false;
-		} else if (formCapacity <= 0) {
-			capacityError = 'Capacity must be greater than 0';
+		} else if (parsedCapacity < 0) {
+			capacityError = 'Capacity must be 0 or greater';
 			isValid = false;
 		}
 
 		return isValid;
+	}
+
+	function handleSubmit() {
+		if (!validateForm()) {
+			return;
+		}
+
+		if (!teamFormRef) {
+			return;
+		}
+
+		isSubmitting = true;
+		teamFormRef.requestSubmit();
+		isSubmitting = false;
+
+		closeModal();
 	}
 
 function handleDelete(team: Team) {
@@ -129,9 +148,10 @@ function handleDelete(team: Team) {
 						data-client-action="delete-team"
 						use:optimisticEnhance={(data, input) => {
 							// Capture snapshot before optimistic delete for rollback
-							const teamId = input.formData.get('id') as string;
+							const idValue = input.formData.get('id') as string;
+							const teamId = unsafeTeamId(idValue);
 							const snapshots = getContext<Map<string, unknown>>('rollbackSnapshots');
-							snapshots.set('delete-team-' + teamId, $appState);
+							snapshots.set('delete-team-' + idValue, $appState);
 
 							// Use store operation to delete team
 							appState.deleteTeam(teamId);
@@ -202,7 +222,8 @@ function handleDelete(team: Team) {
 											data-client-action="update-capacity"
 											use:optimisticEnhance={(data, input) => {
 												// Optimistically update the capacity override
-												const teamId = input.formData.get('teamId') as string;
+												const idValue = input.formData.get('teamId') as string;
+												const teamId = unsafeTeamId(idValue);
 												const yearMonth = input.formData.get('yearMonth') as string;
 												const newCapacity = parseFloat(input.formData.get('capacity') as string);
 
@@ -214,7 +235,7 @@ function handleDelete(team: Team) {
 
 												// Capture snapshot before optimistic update for rollback
 												const snapshots = getContext<Map<string, unknown>>('rollbackSnapshots');
-												const snapshotKey = `update-capacity-${teamId}-${yearMonth}`;
+												const snapshotKey = `update-capacity-${idValue}-${yearMonth}`;
 												snapshots.set(snapshotKey, $appState);
 
 												// Use store operation (auto-removes override if it matches default)
@@ -255,11 +276,18 @@ function handleDelete(team: Team) {
 		action={editingTeam ? '?/updateTeam' : '?/createTeam'}
 		use:optimisticEnhance={(data, input) => {
 			const name = input.formData.get('name') as string;
+			const trimmedName = name.trim();
 			const monthlyCapacity = parseFloat(input.formData.get('monthlyCapacity') as string);
+			if (!trimmedName || isNaN(monthlyCapacity) || monthlyCapacity < 0) {
+				return;
+			}
 
 			if (editingTeam) {
 				// Use store operation to update team
-				appState.updateTeam(editingTeam, { name, monthlyCapacityInPersonMonths: monthlyCapacity });
+				appState.updateTeam(editingTeam, {
+					name: trimmedName,
+					monthlyCapacityInPersonMonths: monthlyCapacity
+				});
 				return;
 			}
 
@@ -267,20 +295,16 @@ function handleDelete(team: Team) {
 			if (typeof generatedIdRaw !== 'string' || generatedIdRaw.length === 0) {
 				return;
 			}
+			const teamId = unsafeTeamId(generatedIdRaw);
 
 			// Use store operation to add team
-			appState.addTeam(name, monthlyCapacity, generatedIdRaw);
+			appState.addTeam(trimmedName, monthlyCapacity, teamId);
 		}}
 		onsubmit={(e: SubmitEvent) => {
-			// Validate form before allowing submission
-			if (!validateForm()) {
-				e.preventDefault();
-				return;
+			e.preventDefault();
+			if (!isSubmitting) {
+				handleSubmit();
 			}
-
-			// Close modal after successful validation
-			// Form will submit naturally with optimisticEnhance
-			closeModal();
 		}}
 	>
 		{#if editingTeam}
@@ -316,11 +340,25 @@ function handleDelete(team: Team) {
 				name="monthlyCapacity"
 				type="number"
 				step="0.1"
-				min="0.1"
-				bind:value={formCapacity}
+				min="0"
+				value={formCapacity}
 				oninput={(e) => {
 					const target = e.currentTarget as HTMLInputElement;
-					formCapacity = target.valueAsNumber;
+					formCapacity = target.value;
+					const trimmedValue = target.value.trim();
+					if (trimmedValue.length === 0) {
+						capacityError = null;
+						return;
+					}
+
+					const parsedCapacity = Number.parseFloat(trimmedValue);
+					if (Number.isNaN(parsedCapacity)) {
+						capacityError = 'Capacity must be a valid number';
+					} else if (parsedCapacity < 0) {
+						capacityError = 'Capacity must be 0 or greater';
+					} else {
+						capacityError = null;
+					}
 				}}
 				class="w-full rounded border px-3 py-2 focus:outline-none focus:ring-1 {capacityError
 					? 'border-red-300 focus:border-red-500 focus:ring-red-500'
@@ -342,7 +380,11 @@ function handleDelete(team: Team) {
 			>
 				Cancel
 			</button>
-			<button type="submit" class="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700">
+			<button
+				type="button"
+				onclick={handleSubmit}
+				class="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+			>
 				{editingTeam ? 'Update' : 'Add'} Team
 			</button>
 		</div>

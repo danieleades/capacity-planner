@@ -1,11 +1,12 @@
-import type { Team, WorkPackage, MonthlyCapacity } from '$lib/types';
+import type { Team, WorkPackage, MonthlyCapacity, TeamId, WorkPackageId } from '$lib/types';
+import { generateTeamId, generateWorkPackageId } from '$lib/types';
 
 /**
  * Creates a mock team for testing
  */
 export function createMockTeam(overrides?: Partial<Team>): Team {
 	return {
-		id: crypto.randomUUID(),
+		id: generateTeamId(),
 		name: 'Test Team',
 		monthlyCapacityInPersonMonths: 2.0,
 		capacityOverrides: [],
@@ -18,12 +19,14 @@ export function createMockTeam(overrides?: Partial<Team>): Team {
  */
 export function createMockWorkPackage(overrides?: Partial<WorkPackage>): WorkPackage {
 	return {
-		id: crypto.randomUUID(),
+		id: generateWorkPackageId(),
 		title: 'Test Work Package',
+		description: null,
 		sizeInPersonMonths: 1.0,
 		priority: 0,
 		progressPercent: 0,
-		assignedTeamId: undefined,
+		assignedTeamId: null,
+		scheduledPosition: null,
 		...overrides,
 	};
 }
@@ -66,4 +69,18 @@ export function createMockTeamWithOverrides(
 	return createMockTeam({
 		capacityOverrides: overrides,
 	});
+}
+
+/**
+ * Helper to create a TeamId from a string - use only in tests
+ */
+export function testTeamId(id: string): TeamId {
+	return id as TeamId;
+}
+
+/**
+ * Helper to create a WorkPackageId from a string - use only in tests
+ */
+export function testWorkPackageId(id: string): WorkPackageId {
+	return id as WorkPackageId;
 }

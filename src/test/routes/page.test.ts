@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
 import Page from '../../routes/+page.svelte';
 import type { PlanningPageData, Team, WorkPackage } from '$lib/types';
+import { testTeamId, testWorkPackageId } from '../utils/test-data';
 
 // Mock the $app/stores module
 vi.mock('$app/stores', () => ({
@@ -41,11 +42,12 @@ function normalizePageData(data: PlanningPageData) {
 			})),
 			workPackages: data.initialState.workPackages.map((workPackage) => ({
 				...workPackage,
-				description: workPackage.description ?? undefined,
-				assignedTeamId: workPackage.assignedTeamId ?? undefined,
-				scheduledPosition: workPackage.scheduledPosition ?? undefined
+				description: workPackage.description ?? null,
+				assignedTeamId: workPackage.assignedTeamId ?? null,
+				scheduledPosition: workPackage.scheduledPosition ?? null
 			}))
-		}
+		},
+		planningStartDate: data.planningStartDate ?? '2025-01-15'
 	};
 }
 
@@ -61,13 +63,13 @@ describe('Page Component - Initial Render', () => {
 	it('should render teams from props immediately without "No teams" message', () => {
 		const teams: Team[] = [
 			{
-				id: 'team-1',
+				id: testTeamId('team-1'),
 				name: 'Engineering Team',
 				monthlyCapacityInPersonMonths: 5.0,
 				capacityOverrides: []
 			},
 			{
-				id: 'team-2',
+				id: testTeamId('team-2'),
 				name: 'Design Team',
 				monthlyCapacityInPersonMonths: 3.0,
 				capacityOverrides: []
@@ -78,7 +80,8 @@ describe('Page Component - Initial Render', () => {
 			initialState: {
 				teams,
 				workPackages: []
-			}
+			},
+			planningStartDate: new Date(2025, 0, 15)
 		};
 
 		renderPage(testData);
@@ -94,19 +97,24 @@ describe('Page Component - Initial Render', () => {
 	it('should render work packages from props immediately without "No work packages" message', () => {
 		const workPackages: WorkPackage[] = [
 			{
-				id: 'wp-1',
+				id: testWorkPackageId('wp-1'),
 				title: 'Build Authentication',
 				description: 'Implement user login',
 				sizeInPersonMonths: 2.5,
 				priority: 0,
-				progressPercent: 0
+				progressPercent: 0,
+				assignedTeamId: null,
+				scheduledPosition: null
 			},
 			{
-				id: 'wp-2',
+				id: testWorkPackageId('wp-2'),
 				title: 'Design Dashboard',
+				description: null,
 				sizeInPersonMonths: 1.5,
 				priority: 1,
-				progressPercent: 0
+				progressPercent: 0,
+				assignedTeamId: null,
+				scheduledPosition: null
 			}
 		];
 
@@ -114,7 +122,8 @@ describe('Page Component - Initial Render', () => {
 			initialState: {
 				teams: [],
 				workPackages
-			}
+			},
+			planningStartDate: new Date(2025, 0, 15)
 		};
 
 		renderPage(testData);
@@ -130,7 +139,7 @@ describe('Page Component - Initial Render', () => {
 	it('should render both teams and work packages from props immediately', () => {
 		const teams: Team[] = [
 			{
-				id: 'team-1',
+				id: testTeamId('team-1'),
 				name: 'Engineering Team',
 				monthlyCapacityInPersonMonths: 5.0,
 				capacityOverrides: []
@@ -139,12 +148,13 @@ describe('Page Component - Initial Render', () => {
 
 		const workPackages: WorkPackage[] = [
 			{
-				id: 'wp-1',
+				id: testWorkPackageId('wp-1'),
 				title: 'Build Authentication',
+				description: null,
 				sizeInPersonMonths: 2.5,
 				priority: 0,
 				progressPercent: 0,
-				assignedTeamId: 'team-1',
+				assignedTeamId: testTeamId('team-1'),
 				scheduledPosition: 0
 			}
 		];
@@ -153,7 +163,8 @@ describe('Page Component - Initial Render', () => {
 			initialState: {
 				teams,
 				workPackages
-			}
+			},
+			planningStartDate: new Date(2025, 0, 15)
 		};
 
 		renderPage(testData);
@@ -170,7 +181,7 @@ describe('Page Component - Initial Render', () => {
 	it('should render assigned work packages under their team columns', () => {
 		const teams: Team[] = [
 			{
-				id: 'team-1',
+				id: testTeamId('team-1'),
 				name: 'Engineering Team',
 				monthlyCapacityInPersonMonths: 5.0,
 				capacityOverrides: []
@@ -179,20 +190,24 @@ describe('Page Component - Initial Render', () => {
 
 		const workPackages: WorkPackage[] = [
 			{
-				id: 'wp-1',
+				id: testWorkPackageId('wp-1'),
 				title: 'Assigned Work Package',
+				description: null,
 				sizeInPersonMonths: 2.5,
 				priority: 0,
 				progressPercent: 0,
-				assignedTeamId: 'team-1',
+				assignedTeamId: testTeamId('team-1'),
 				scheduledPosition: 0
 			},
 			{
-				id: 'wp-2',
+				id: testWorkPackageId('wp-2'),
 				title: 'Unassigned Work Package',
+				description: null,
 				sizeInPersonMonths: 1.5,
 				priority: 1,
-				progressPercent: 0
+				progressPercent: 0,
+				assignedTeamId: null,
+				scheduledPosition: null
 			}
 		];
 
@@ -200,7 +215,8 @@ describe('Page Component - Initial Render', () => {
 			initialState: {
 				teams,
 				workPackages
-			}
+			},
+			planningStartDate: new Date(2025, 0, 15)
 		};
 
 		renderPage(testData);
@@ -218,7 +234,8 @@ describe('Page Component - Initial Render', () => {
 			initialState: {
 				teams: [],
 				workPackages: []
-			}
+			},
+			planningStartDate: new Date(2025, 0, 15)
 		};
 
 		renderPage(testData);

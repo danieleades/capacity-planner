@@ -63,7 +63,9 @@ vi.mock('$lib/server/repositories/planning.repository', async () => {
 		'$lib/server/repositories/planning.repository'
 	);
 	return {
-		getPlanningView: () => actual.getPlanningView(testDb)
+		getPlanningView: () => actual.getPlanningView(testDb),
+		getPlanningStartDate: () => actual.getPlanningStartDate(testDb),
+		setPlanningStartDate: (dateStr: string) => actual.setPlanningStartDate(dateStr, testDb)
 	};
 });
 
@@ -492,7 +494,7 @@ describe('Planning Page Routes', () => {
 				throw new Error('Expected initialState in result');
 			}
 			const unassignedWorkPackages = view.initialState.workPackages.filter((w: WorkPackage) => !w.assignedTeamId);
-			expect(unassignedWorkPackages[0].description).toBeUndefined();
+			expect(unassignedWorkPackages[0].description).toBeNull();
 		});
 
 		it('should return error when title is missing', async () => {
@@ -865,10 +867,10 @@ describe('Planning Page Routes', () => {
 			
 			expect(loadedWorkPackage).toBeDefined();
 			expect(loadedWorkPackage?.scheduledPosition).toBe(0);
-			expect(loadedWorkPackage?.assignedTeamId).toBeUndefined();
+			expect(loadedWorkPackage?.assignedTeamId).toBeNull();
 		});
 
-		it('should convert null scheduledPosition to undefined', async () => {
+		it('should preserve null scheduledPosition', async () => {
 			const wp = await insertWorkPackage({
 				title: 'Work Package with null position',
 				sizeInPersonMonths: 2.0
@@ -887,7 +889,7 @@ describe('Planning Page Routes', () => {
 			const loadedWorkPackage = result.initialState.workPackages.find((w: WorkPackage) => w.id === wp.id);
 			
 			expect(loadedWorkPackage).toBeDefined();
-			expect(loadedWorkPackage?.scheduledPosition).toBeUndefined();
+			expect(loadedWorkPackage?.scheduledPosition).toBeNull();
 		});
 	});
 
@@ -1187,7 +1189,7 @@ describe('Planning Page Routes', () => {
 				throw new Error('Expected initialState in result');
 			}
 			const unassignedWp = view.initialState.workPackages.find((w: WorkPackage) => w.id === wp.id);
-			expect(unassignedWp?.assignedTeamId).toBeUndefined();
+			expect(unassignedWp?.assignedTeamId).toBeNull();
 		});
 	});
 
@@ -1231,8 +1233,8 @@ describe('Planning Page Routes', () => {
 			const clearedWp1 = view.initialState.workPackages.find((w: WorkPackage) => w.id === wp1.id);
 			const clearedWp2 = view.initialState.workPackages.find((w: WorkPackage) => w.id === wp2.id);
 
-			expect(clearedWp1?.scheduledPosition).toBeUndefined();
-			expect(clearedWp2?.scheduledPosition).toBeUndefined();
+			expect(clearedWp1?.scheduledPosition).toBeNull();
+			expect(clearedWp2?.scheduledPosition).toBeNull();
 		});
 
 		it('should not affect assigned work packages', async () => {
@@ -1360,7 +1362,7 @@ describe('Planning Page Routes', () => {
 				throw new Error('Expected initialState in result');
 			}
 			const updatedWp = view.initialState.workPackages.find((w: WorkPackage) => w.id === wp.id);
-			expect(updatedWp?.description).toBeUndefined();
+			expect(updatedWp?.description).toBeNull();
 		});
 	});
 
@@ -1419,7 +1421,7 @@ describe('Planning Page Routes', () => {
 			expectErrorMessage(result, 'Invalid name');
 		});
 
-		it('should return error when capacity is zero', async () => {
+		it('should allow capacity to be zero', async () => {
 			const formData = new FormData();
 			formData.set('id', crypto.randomUUID());
 			formData.set('name', 'Test Team');
@@ -1428,8 +1430,13 @@ describe('Planning Page Routes', () => {
 			const mockEvent = createMockRequest(formData);
 			const result = await actions.createTeam(mockEvent as Parameters<typeof actions.createTeam>[0]);
 
-			expect(result).toHaveProperty('status', 400);
-			expectErrorMessage(result, 'Invalid monthly capacity');
+			expect(result).toHaveProperty('success', true);
+
+			const view = await load({} as Parameters<typeof load>[0]);
+			if (!view || !('initialState' in view)) {
+				throw new Error('Expected initialState in result');
+			}
+			expect(view.initialState.teams[0].monthlyCapacityInPersonMonths).toBe(0);
 		});
 
 		it('should return error when capacity is negative', async () => {
@@ -1461,7 +1468,7 @@ describe('Planning Page Routes', () => {
 			expectErrorMessage(result, 'Invalid name');
 		});
 
-		it('should return error when capacity is zero', async () => {
+		it('should allow capacity to be zero', async () => {
 			const team = await insertTeam({ name: 'Original', monthlyCapacity: 3.0 });
 
 			const formData = new FormData();
@@ -1471,8 +1478,13 @@ describe('Planning Page Routes', () => {
 			const mockEvent = createMockRequest(formData);
 			const result = await actions.updateTeam(mockEvent as Parameters<typeof actions.updateTeam>[0]);
 
-			expect(result).toHaveProperty('status', 400);
-			expectErrorMessage(result, 'Invalid monthly capacity');
+			expect(result).toEqual({ success: true });
+
+			const view = await load({} as Parameters<typeof load>[0]);
+			if (!view || !('initialState' in view)) {
+				throw new Error('Expected initialState in result');
+			}
+			expect(view.initialState.teams[0].monthlyCapacityInPersonMonths).toBe(0);
 		});
 
 		it('should return error when capacity is negative', async () => {

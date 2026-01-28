@@ -1,4 +1,5 @@
-import type { Team, WorkPackage, MonthlyCapacity, AppState } from '$lib/types';
+import type { Team, WorkPackage, MonthlyCapacity, AppState, ReorderUpdate, TeamId, WorkPackageId } from '$lib/types';
+import { generateTeamId, generateWorkPackageId } from '$lib/types';
 
 /**
  * Pure functions for state operations - testable without side effects
@@ -6,13 +7,13 @@ import type { Team, WorkPackage, MonthlyCapacity, AppState } from '$lib/types';
 
 // Team Operations
 
-export function addTeam(state: AppState, name: string, capacity: number, id?: string): AppState {
+export function addTeam(state: AppState, name: string, capacity: number, id?: TeamId): AppState {
 	return {
 		...state,
 		teams: [
 			...state.teams,
 			{
-				id: id || crypto.randomUUID(),
+				id: id || generateTeamId(),
 				name,
 				monthlyCapacityInPersonMonths: capacity,
 				capacityOverrides: [],
@@ -23,7 +24,7 @@ export function addTeam(state: AppState, name: string, capacity: number, id?: st
 
 export function updateTeam(
 	state: AppState,
-	id: string,
+	id: TeamId,
 	updates: Partial<Omit<Team, 'id'>>
 ): AppState {
 	return {
@@ -32,14 +33,14 @@ export function updateTeam(
 	};
 }
 
-export function deleteTeam(state: AppState, id: string): AppState {
+export function deleteTeam(state: AppState, id: TeamId): AppState {
 	return {
 		...state,
 		teams: state.teams.filter((team) => team.id !== id),
 		// Unassign work packages from deleted team and clear scheduledPosition
 		workPackages: state.workPackages.map((wp) =>
 			wp.assignedTeamId === id
-				? { ...wp, assignedTeamId: undefined, scheduledPosition: undefined }
+				? { ...wp, assignedTeamId: null, scheduledPosition: null }
 				: wp
 		),
 	};
@@ -49,7 +50,7 @@ export function deleteTeam(state: AppState, id: string): AppState {
 
 export function setMonthlyCapacity(
 	state: AppState,
-	teamId: string,
+	teamId: TeamId,
 	yearMonth: string,
 	capacity: number
 ): AppState {
@@ -86,24 +87,6 @@ export function setMonthlyCapacity(
 	};
 }
 
-export function clearMonthlyCapacity(
-	state: AppState,
-	teamId: string,
-	yearMonth: string
-): AppState {
-	return {
-		...state,
-		teams: state.teams.map((team) => {
-			if (team.id !== teamId) return team;
-
-			const overrides = team.capacityOverrides;
-			const newOverrides = overrides.filter((co) => co.yearMonth !== yearMonth);
-
-			return { ...team, capacityOverrides: newOverrides };
-		}),
-	};
-}
-
 // Work Package Operations
 
 export function addWorkPackage(
@@ -111,7 +94,7 @@ export function addWorkPackage(
 	title: string,
 	size: number,
 	description?: string,
-	id?: string
+	id?: WorkPackageId
 ): AppState {
 	// Priority starts at 0 for first work package, then increments from max existing priority
 	// When empty: maxPriority = -1, so first work package gets priority 0
@@ -125,13 +108,13 @@ export function addWorkPackage(
 		workPackages: [
 			...state.workPackages,
 			{
-				id: id || crypto.randomUUID(),
+				id: id || generateWorkPackageId(),
 				title,
-				description,
+				description: description ?? null,
 				sizeInPersonMonths: size,
 				priority: maxPriority + 1,
-				assignedTeamId: undefined,
-				scheduledPosition: undefined,
+				assignedTeamId: null,
+				scheduledPosition: null,
 				progressPercent: 0,
 			},
 		],
@@ -140,7 +123,7 @@ export function addWorkPackage(
 
 export function updateWorkPackage(
 	state: AppState,
-	id: string,
+	id: WorkPackageId,
 	updates: Partial<Omit<WorkPackage, 'id'>>
 ): AppState {
 	return {
@@ -149,30 +132,10 @@ export function updateWorkPackage(
 	};
 }
 
-export function deleteWorkPackage(state: AppState, id: string): AppState {
+export function deleteWorkPackage(state: AppState, id: WorkPackageId): AppState {
 	return {
 		...state,
 		workPackages: state.workPackages.filter((wp) => wp.id !== id),
-	};
-}
-
-export function assignWorkPackage(
-	state: AppState,
-	workPackageId: string,
-	teamId: string | undefined
-): AppState {
-	return {
-		...state,
-		workPackages: state.workPackages.map((wp) =>
-			wp.id === workPackageId ? { ...wp, assignedTeamId: teamId } : wp
-		),
-	};
-}
-
-export function reorderWorkPackages(state: AppState, workPackages: WorkPackage[]): AppState {
-	return {
-		...state,
-		workPackages: workPackages.map((wp, index) => ({ ...wp, priority: index })),
 	};
 }
 
@@ -182,7 +145,7 @@ export function reorderWorkPackages(state: AppState, workPackages: WorkPackage[]
  */
 export function batchUpdateWorkPackages(
 	state: AppState,
-	updates: Array<{ id: string; assignedTeamId?: string | null; scheduledPosition?: number }>
+	updates: ReorderUpdate[]
 ): AppState {
 	return {
 		...state,
@@ -192,10 +155,8 @@ export function batchUpdateWorkPackages(
 
 			return {
 				...wp,
-				...(update.assignedTeamId !== undefined
-					? { assignedTeamId: update.assignedTeamId ?? undefined }
-					: {}),
-				...(update.scheduledPosition !== undefined ? { scheduledPosition: update.scheduledPosition } : {}),
+				assignedTeamId: update.teamId,
+				scheduledPosition: update.position,
 			};
 		}),
 	};
@@ -208,13 +169,10 @@ export function batchUpdateWorkPackages(
 export function clearUnassignedScheduledPositions(state: AppState): AppState {
 	return {
 		...state,
-		workPackages: state.workPackages.map((wp) => {
-			if (!wp.assignedTeamId) {
-				// Remove scheduledPosition from unassigned work packages
-				const { scheduledPosition: _scheduledPosition, ...rest } = wp;
-				return rest;
-			}
-			return wp;
-		}),
+		workPackages: state.workPackages.map((wp) =>
+			wp.assignedTeamId === null
+				? { ...wp, scheduledPosition: null }
+				: wp
+		),
 	};
 }

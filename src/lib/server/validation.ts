@@ -1,27 +1,37 @@
 import { z } from 'zod';
+import { YearMonth, TeamSchema, WorkPackageSchema } from '$lib/types';
+import { TeamIdSchema, WorkPackageIdSchema } from '$lib/types/branded';
 
 /**
- * Reusable validation primitives
+ * Server validation schemas
+ *
+ * These schemas are derived from the base schemas in $lib/types/index.ts
+ * to ensure consistency and avoid duplication.
  */
-const yearMonth = z.string().regex(/^\d{4}-\d{2}$/);
-const positiveNumber = z.number().positive();
-const nonNegativeInt = z.number().int().nonnegative();
+
+// YearMonth validation (reusable primitive)
+const yearMonth = z.string().refine(
+	(str) => YearMonth.isValid(str),
+	{ message: 'Must be valid YYYY-MM with month 1-12' }
+);
 
 /**
  * Team creation validation schema
+ * Derives from TeamSchema, picking required fields for creation
  */
 export const createTeamSchema = z.object({
-	id: z.uuid(),
-	name: z.string().min(1).max(100),
-	monthlyCapacity: positiveNumber
+	id: TeamIdSchema,
+	name: TeamSchema.shape.name.pipe(z.string().max(100)),
+	monthlyCapacity: TeamSchema.shape.monthlyCapacityInPersonMonths
 });
 
 /**
  * Team update validation schema
+ * All fields optional for partial updates
  */
 export const updateTeamSchema = z.object({
-	name: z.string().min(1).max(100).optional(),
-	monthlyCapacity: positiveNumber.optional()
+	name: TeamSchema.shape.name.pipe(z.string().max(100)).optional(),
+	monthlyCapacity: TeamSchema.shape.monthlyCapacityInPersonMonths.optional()
 });
 
 /**
@@ -29,23 +39,24 @@ export const updateTeamSchema = z.object({
  * Note: priority is computed server-side and not part of input validation
  */
 export const createWorkPackageSchema = z.object({
-	id: z.uuid(),
-	title: z.string().min(1).max(200),
-	description: z.string().max(1000).optional(),
-	sizeInPersonMonths: positiveNumber
+	id: WorkPackageIdSchema,
+	title: WorkPackageSchema.shape.title.pipe(z.string().max(200)),
+	description: z.string().max(1000).nullable().optional(),
+	sizeInPersonMonths: WorkPackageSchema.shape.sizeInPersonMonths
 });
 
 /**
  * Work package update validation schema
+ * All fields optional for partial updates
  */
 export const updateWorkPackageSchema = z.object({
-	title: z.string().min(1).max(200).optional(),
-	description: z.string().max(1000).optional().nullable(),
-	sizeInPersonMonths: positiveNumber.optional(),
-	priority: nonNegativeInt.optional(),
-	assignedTeamId: z.uuid().optional().nullable(),
-	scheduledPosition: nonNegativeInt.optional().nullable(),
-	progressPercent: z.number().int().min(0).max(100).optional()
+	title: WorkPackageSchema.shape.title.pipe(z.string().max(200)).optional(),
+	description: z.string().max(1000).nullable().optional(),
+	sizeInPersonMonths: WorkPackageSchema.shape.sizeInPersonMonths.optional(),
+	priority: WorkPackageSchema.shape.priority.optional(),
+	assignedTeamId: TeamIdSchema.nullable().optional(),
+	scheduledPosition: WorkPackageSchema.shape.scheduledPosition.optional(),
+	progressPercent: WorkPackageSchema.shape.progressPercent.optional()
 });
 
 /**
@@ -53,7 +64,7 @@ export const updateWorkPackageSchema = z.object({
  */
 export const capacityOverrideSchema = z.object({
 	id: z.uuid(),
-	teamId: z.uuid(),
+	teamId: TeamIdSchema,
 	yearMonth: yearMonth,
 	capacity: z.number().nonnegative() // Allow zero for months with no capacity (e.g., holidays)
 });

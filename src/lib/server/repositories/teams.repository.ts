@@ -4,6 +4,7 @@ import { eq, and } from 'drizzle-orm';
 import type { Team, CapacityOverride, NewTeam, TeamUpdate, DbParam } from './types';
 import { teamValidation, capacityOverrideValidation, handleValidationError } from '../validation';
 import { withTimestamps, withUpdatedTimestamp, dbOperation } from './db-helpers';
+import { generateId } from '$lib/utils/id';
 
 /**
  * Re-export types for backward compatibility
@@ -105,7 +106,7 @@ export async function setCapacityOverride(
 	return dbOperation(async () => {
 		try {
 			const validated = capacityOverrideValidation.create.parse({
-				id: crypto.randomUUID(),
+				id: generateId(),
 				teamId,
 				yearMonth,
 				capacity
@@ -148,16 +149,3 @@ export async function setCapacityOverride(
  * @param yearMonth - Year and month in format "YYYY-MM"
  * @param db - Database instance (defaults to main db)
  */
-export async function removeCapacityOverride(
-	teamId: string,
-	yearMonth: string,
-	db: DbParam = defaultDb
-): Promise<void> {
-	return dbOperation(async () => {
-		db.delete(capacityOverrides)
-			.where(
-				and(eq(capacityOverrides.teamId, teamId), eq(capacityOverrides.yearMonth, yearMonth))
-			)
-			.run();
-	}, 'Failed to remove capacity override');
-}

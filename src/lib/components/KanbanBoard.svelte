@@ -1,10 +1,12 @@
 <script lang="ts">
 	import { getContext } from 'svelte';
 	import type { Readable } from 'svelte/store';
+	import { SvelteMap } from 'svelte/reactivity';
 	import { dndzone } from 'svelte-dnd-action';
 	import { createAppStore } from '$lib/stores/appState';
 	import {
 		calculateTeamBacklog,
+		calculateTeamSchedule,
 		formatMonths,
 		formatDate,
 		getRemainingWork,
@@ -12,17 +14,19 @@
 		sortByScheduledPosition,
 		groupWorkPackagesByTeam,
 		type TeamBacklogMetrics,
+		type ScheduledWorkPackage,
 	} from '$lib/utils/capacity';
-	import type { WorkPackage, Team, PlanningPageData } from '$lib/types';
+	import { YearMonth, type WorkPackage, type Team, type PlanningPageData, type ReorderUpdate, type TeamId, unsafeTeamId } from '$lib/types';
 	import type { OptimisticEnhanceAction } from '$lib/types/optimistic';
 	import CapacitySparkline from './CapacitySparkline.svelte';
 	import WorkPackageModal from './WorkPackageModal.svelte';
 
 	interface Props {
 		optimisticEnhance: OptimisticEnhanceAction<PlanningPageData>;
+		planningStartDate: Date;
 	}
 
-	let { optimisticEnhance }: Props = $props();
+	let { optimisticEnhance, planningStartDate }: Props = $props();
 
 	// Get stores from context
 	const appState = getContext<ReturnType<typeof createAppStore>>('appState');
@@ -74,7 +78,7 @@
 	// Performance optimization: Pre-groups work packages by team in O(n) time,
 	// then passes pre-filtered arrays to calculateTeamBacklog to avoid redundant
 	// O(n) filtering per team. This reduces complexity from O(teams × packages) to O(packages).
-	function buildColumns(): Column[] {
+	function buildColumns(startDate: Date): Column[] {
 		const { byTeam, unassigned } = groupWorkPackagesByTeam($appState.workPackages);
 
 		const cols: Column[] = [
@@ -90,7 +94,7 @@
 			const teamWPs = byTeam.get(team.id) || [];
 			// Pass preFiltered=true since teamWPs is already filtered for this team
 			// This avoids redundant O(n) filtering inside calculateTeamBacklog
-			const metrics = calculateTeamBacklog(team, teamWPs, true);
+			const metrics = calculateTeamBacklog(team, teamWPs, true, startDate);
 
 			cols.push({
 				id: team.id,
@@ -107,22 +111,34 @@
 		return cols;
 	}
 
-	// Use mutable local state for columns (required by svelte-dnd-action)
-	// eslint-disable-next-line svelte/prefer-writable-derived
-	let columns: Column[] = $state(buildColumns());
-
-	// Sync columns when store changes (add/edit/delete operations)
-	// buildColumns() will sort by scheduledPosition (with fallback to priority)
-	// Note: $state + $effect is required here instead of $derived because
-	// svelte-dnd-action needs mutable local state that gets updated in event handlers
-	$effect(() => {
-		columns = buildColumns();
+	// svelte-dnd-action requires mutable local state that DnD handlers can write to.
+	// Using $state + $effect.pre (not $derived) because svelte-dnd-action's action
+	// update cycle can conflict with writable $derived re-derivation timing.
+	// eslint-disable-next-line svelte/prefer-writable-derived -- see comment above
+	let columns: Column[] = $state<Column[]>([]);
+	// Sync columns when store or planningStartDate changes (runs before DOM update)
+	$effect.pre(() => {
+		columns = buildColumns(planningStartDate);
 	});
 
 	// Calculate global maximum remaining work across all work packages for size scaling
 	const globalMaxRemainingWork = $derived(
 		$appState.workPackages.reduce((max, wp) => Math.max(max, getRemainingWork(wp)), 0)
 	);
+
+	// Create a lookup map from work package ID to its scheduled dates
+	// This allows O(1) lookup when rendering cards
+	const scheduleLookup = $derived.by(() => {
+		const lookup = new SvelteMap<string, ScheduledWorkPackage>();
+		for (const team of $teams) {
+			const teamWPs = $appState.workPackages.filter((wp) => wp.assignedTeamId === team.id);
+			const schedule = calculateTeamSchedule(team, teamWPs, planningStartDate);
+			for (const swp of schedule) {
+				lookup.set(swp.workPackage.id, swp);
+			}
+		}
+		return lookup;
+	});
 
 	function handleDndConsider(columnId: string, e: CustomEvent) {
 		// Update local state during drag for visual feedback
@@ -147,7 +163,7 @@
 	 */
 	function handleDndFinalize(columnId: string, e: CustomEvent) {
 		const items = e.detail.items as WorkPackage[];
-		const newTeamId = columnId === 'unassigned' ? undefined : columnId;
+		const newTeamId: TeamId | null = columnId === 'unassigned' ? null : unsafeTeamId(columnId);
 
 
 		// Update local state first
@@ -158,21 +174,10 @@
 			return col;
 		});
 
-		// Collect all updates for the batch request
-		type LocalReorderUpdate = {
-			id: string;
-			teamId: string | null;
-			position: number;
-		};
-		const updates: LocalReorderUpdate[] = items.map((wp, index) => ({
+		// Collect all updates for the batch request using shared DTO type
+		const updates: ReorderUpdate[] = items.map((wp, index) => ({
 			id: wp.id,
-			teamId: newTeamId ?? null,
-			position: index,
-			isPending: false
-		}));
-		const persistedUpdates = updates.map((update, index) => ({
-			id: update.id,
-			teamId: update.teamId,
+			teamId: newTeamId,
 			position: index
 		}));
 
@@ -180,19 +185,15 @@
 		const snapshot = $appState;
 
 		// Optimistically update the store using batch operation
-		appState.batchUpdateWorkPackages(updates.map(u => ({
-			id: u.id,
-			assignedTeamId: u.teamId,
-			scheduledPosition: u.position
-		})));
+		appState.batchUpdateWorkPackages(updates);
 
-		// Skip server request if there are no persisted updates to send
-		if (persistedUpdates.length === 0) {
+		// Skip server request if there are no updates to send
+		if (updates.length === 0) {
 			return;
 		}
 
 		// Submit single batch request to persist all changes
-		submitBatchReorder(persistedUpdates, snapshot);
+		submitBatchReorder(updates, snapshot);
 	}
 
 	// Centralized error handler for fetch operations with rollback support
@@ -224,7 +225,7 @@
 
 	// Helper function to submit batch reorder to server
 	async function submitBatchReorder(
-		updates: Array<{ id: string; teamId: string | null; position: number }>,
+		updates: ReorderUpdate[],
 		snapshot: typeof $appState
 	) {
 		const formData = new FormData();
@@ -381,6 +382,7 @@
 						{@const cardHeight = sizeScalingIntensity > 0
 							? calculateCardHeight(getRemainingWork(wp), globalMaxRemainingWork, sizeScalingIntensity)
 							: null}
+						{@const swp = scheduleLookup.get(wp.id)}
 						<div
 							class="mb-2 cursor-move rounded border border-gray-300 bg-white p-3 shadow-sm transition-all duration-200"
 							style={cardHeight ? `min-height: ${cardHeight}px` : ''}
@@ -395,6 +397,17 @@
 								</span>
 								<span class="text-gray-400">Priority: {wp.priority + 1}</span>
 							</div>
+							{#if swp}
+								{@const startYM = YearMonth.fromDate(swp.startDate)}
+								{@const endYM = YearMonth.fromDate(swp.endDate)}
+								<div class="mt-2 text-xs text-gray-500">
+									{#if startYM.toString() === endYM.toString()}
+										{startYM.format()}
+									{:else}
+										{startYM.format()} → {endYM.format()}
+									{/if}
+								</div>
+							{/if}
 							{#if (wp.progressPercent ?? 0) > 0}
 								<div class="mt-2">
 									<div class="flex items-center justify-between text-xs text-gray-500">

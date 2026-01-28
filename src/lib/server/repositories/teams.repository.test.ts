@@ -4,8 +4,7 @@ import {
 	createTeam,
 	updateTeam,
 	deleteTeam,
-	setCapacityOverride,
-	removeCapacityOverride
+	setCapacityOverride
 } from './teams.repository';
 import type { CreateTeamInput } from './teams.repository';
 import { teams, capacityOverrides, workPackages } from '../schema';
@@ -285,52 +284,4 @@ describe('teams repository', () => {
 		});
 	});
 
-	describe('removeCapacityOverride', () => {
-		it('should remove a capacity override', async () => {
-			const { id } = await createTeam(
-				buildTeamInput({
-					name: 'Team',
-					monthlyCapacity: 2.0
-				}),
-				db
-			);
-
-			await setCapacityOverride(id, '2025-01', 3.0, db);
-			await removeCapacityOverride(id, '2025-01', db);
-
-			const overrides = db.select().from(capacityOverrides).all();
-			expect(overrides).toHaveLength(0);
-		});
-
-		it('should only remove the specified override', async () => {
-			const { id } = await createTeam(
-				buildTeamInput({
-					name: 'Team',
-					monthlyCapacity: 2.0
-				}),
-				db
-			);
-
-			await setCapacityOverride(id, '2025-01', 3.0, db);
-			await setCapacityOverride(id, '2025-02', 4.0, db);
-
-			await removeCapacityOverride(id, '2025-01', db);
-
-			const overrides = db.select().from(capacityOverrides).all();
-			expect(overrides).toHaveLength(1);
-			expect(overrides[0].yearMonth).toBe('2025-02');
-		});
-
-		it('should handle removing non-existent override gracefully', async () => {
-			const { id } = await createTeam(
-				buildTeamInput({
-					name: 'Team',
-					monthlyCapacity: 2.0
-				}),
-				db
-			);
-
-			await expect(removeCapacityOverride(id, '2025-01', db)).resolves.not.toThrow();
-		});
-	});
 });
